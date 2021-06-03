@@ -1,7 +1,5 @@
 package crdt
 
-const BASE = 10
-
 type Identifier struct {
 	pos  int
 	site int
@@ -53,12 +51,12 @@ func AllocPosition(prevPos Position, afterPos Position) Position {
 	interval := 0
 	for interval < 1 {
 		index++
-
-		interval = PositionSubtract(prefix(afterPos, index), prefix(prevPos, index)) - 1
+		interval++
+		// interval = PositionSubtract(prefix(afterPos, index), prefix(prevPos, index)) - 1
 	}
 	step := min(BASE, interval)
 
-	position := PositionAddInt(prefix(prevPos, index), randBetween(0, step)+1)
+	position := PositionAddInt(prefix(prevPos, index), randBetween(0, step) + 1)
 
 	return position
 }

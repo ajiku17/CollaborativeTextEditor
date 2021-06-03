@@ -1,5 +1,6 @@
 package crdt
 
+const BASE = 10
 type Number []int
 
 func prependZeroes(n Number, length int) {

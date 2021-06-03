@@ -1,8 +1,9 @@
 package main
 
 import (
-	"CollaborativeTextEditor/crdt"
 	"fmt"
+
+	"github.com/crdt"
 )
 
 func main() {
@@ -12,5 +13,5 @@ func main() {
 
 	doc := crdt.NewDocument()
 
-	fmt.Print(doc.toString())
+	fmt.Print(doc.ToString())
 }
