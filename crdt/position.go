@@ -1,5 +1,4 @@
 package crdt
-
 type Identifier struct {
 	pos  int
 	site int
@@ -48,7 +47,7 @@ func prefix(position Position, index int) Position {
 
 func AllocPosition(prevPos Position, afterPos Position) Position {
 	index := 0
-	interval := 0
+	interval := 0 
 	for interval < 1 {
 		index++
 		interval++
@@ -59,48 +58,4 @@ func AllocPosition(prevPos Position, afterPos Position) Position {
 	position := PositionAddInt(prefix(prevPos, index), randBetween(0, step) + 1)
 
 	return position
-}
-
-func TestPrefix() {
-	var position Position
-	zero := Identifier{0, 0}
-
-	for i := 0; i < 10; i++ {
-		position = append(position, Identifier{pos: i, site: i})
-	}
-
-	pref := prefix(position, 5)
-	if len(pref) != 5 {
-		panic("invalid size")
-	}
-
-	for i := 0; i < 5; i++ {
-		if pref[i] != position[i] {
-			panic("aaaaa!")
-		}
-	}
-
-	pref = prefix(position, 12)
-	if len(pref) != 12 {
-		panic("invalid size")
-	}
-
-	for i := 0; i < 10; i++ {
-		if pref[i] != position[i] {
-			panic("aaaaa!")
-		}
-	}
-
-	if pref[10] != zero {
-		panic("aaaaa!")
-	}
-
-	if pref[11] != zero {
-		panic("aaaaa!")
-	}
-
-	pref = prefix(position, 0)
-	if len(pref) != 0 {
-		panic("invalid size")
-	}
 }

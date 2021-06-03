@@ -9,8 +9,6 @@ import (
 func main() {
 	fmt.Println("Hello world")
 
-	crdt.TestPrefix()
-
 	doc := crdt.NewDocument()
 
 	fmt.Print(doc.ToString())
