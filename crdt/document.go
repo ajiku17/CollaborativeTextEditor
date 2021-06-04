@@ -1,7 +1,7 @@
 package crdt
 
 import (
-	"math/rand"
+	"math"
 )
 
 type Element struct {
@@ -13,29 +13,26 @@ type Document []Element
 
 func NewDocument() *Document {
 	doc := new(Document)
-
+	doc.docInsert(0, Element{"", Position{Identifier{0, math.MaxInt64}}})
+	doc.docInsert(0, Element{"", Position{Identifier{0, 0}}})
 	return doc
 }
 
-
-func randBetween(low, high int) int {
-	return rand.Intn(high-low) + low
+func (doc *Document) docInsert(index int, elem Element) {
+	copyDoc := append(*doc, Element{})
+	doc = new(Document)
+	(*doc) = append(*doc, copyDoc[:index]...)
+	(*doc) = append(*doc, elem)
+	(*doc) = append(*doc, copyDoc[index:]...)
 }
 
-func min(x, y int) int {
-	if x > y {
-		return y
-	}
-
-	return x
-}
-
-func (doc *Document) InsertAt(val string, index int) {
+func (doc *Document) InsertAt(val string, index, site int) {
 	prevPos := ((*doc)[index]).position
-	afterPos := ((*doc)[index + 1]).position
-	position := AllocPosition(prevPos, afterPos)
-	element := Element{val, position}
-	(*doc)[index] = element
+	afterPos := ((*doc)[index+1]).position
+	position := AllocPosition(prevPos, afterPos, site)
+	// fmt.Printf("%v", position)
+	doc.docInsert(index, Element{val, position})
+
 }
 
 func (doc *Document) DeleteAt(index int) {
