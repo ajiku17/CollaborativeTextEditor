@@ -231,6 +231,36 @@ func TestPositionAllocation(t *testing.T) {
 	AssertTrue(t, newPosition[len(newPosition)-1].pos < 10)
 }
 
+func TestDocCreation(t *testing.T) {
+	document := NewDocument()
+	AssertTrue(t, document.GetLength() == 2)
+	AssertTrue(t, (*document)[0].position[0].pos == 0)
+
+}
+
+func TestDocInsert(t *testing.T) {
+	document := new(Document)
+
+	// Insert at the beginning
+	document = document.docInsert(0, Element{"data", nil})
+	AssertTrue(t, document.GetLength() == 1)
+
+	document = document.docInsert(1, Element{"data1", Position{Identifier{0, 5}}})
+	AssertTrue(t, document.GetLength() == 2)
+	AssertTrue(t, (*document)[1].position[0].site == 5)
+
+	// Insert in the middle
+	document = document.docInsert(1, Element{"data2", Position{Identifier{0, 7}}})
+	AssertTrue(t, document.GetLength() == 3)
+	AssertTrue(t, (*document)[1].position[0].site == 7)
+	AssertTrue(t, (*document)[2].position[0].site == 5)
+
+	// Insert at the end
+	document = document.docInsert(3, Element{"end", Position{Identifier{0, 7}}})
+	AssertTrue(t, document.GetLength() == 4)
+	AssertTrue(t, (*document)[3].data == "end")
+}
+
 func TestDocument(t *testing.T) {
 	document := NewDocument()
 	document.InsertAt("H", 0, 1)

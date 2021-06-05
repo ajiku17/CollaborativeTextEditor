@@ -1,6 +1,7 @@
 package crdt
 
 import (
+	"fmt"
 	"math"
 )
 
@@ -13,17 +14,23 @@ type Document []Element
 
 func NewDocument() *Document {
 	doc := new(Document)
-	doc.docInsert(0, Element{"", Position{Identifier{0, math.MaxInt64}}})
-	doc.docInsert(0, Element{"", Position{Identifier{0, 0}}})
+	fmt.Printf("%v", doc)
+	doc = doc.docInsert(0, Element{"", Position{Identifier{0, math.MaxInt64}}})
+	doc = doc.docInsert(0, Element{"", Position{Identifier{0, 0}}})
 	return doc
 }
 
-func (doc *Document) docInsert(index int, elem Element) {
-	copyDoc := append(*doc, Element{})
+func (doc *Document) GetLength() int {
+	return len(*doc)
+}
+
+func (doc *Document) docInsert(index int, elem Element) *Document {
+	copyDoc := *doc
 	doc = new(Document)
 	(*doc) = append(*doc, copyDoc[:index]...)
 	(*doc) = append(*doc, elem)
 	(*doc) = append(*doc, copyDoc[index:]...)
+	return doc
 }
 
 func (doc *Document) InsertAt(val string, index, site int) {
