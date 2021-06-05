@@ -40,17 +40,39 @@ func PositionAddInt(pos Position, val int) Position {
 	return append(pos, Identifier{identifier.pos + val, identifier.site})
 }
 
-func prefix(position Position, index int) Position {
-	var positionCopy Position
+func prefix(position Position, index int) Number {
+	var numberCopy Number
 
 	for i := 0; i < index; i++ {
 		if i < len(position) {
-			positionCopy = append(positionCopy, position[i])
+			numberCopy = append(numberCopy, position[i].pos)
 		} else {
-			positionCopy = append(positionCopy, Identifier{})
+			numberCopy = append(numberCopy, 0)
 		}
 	}
-	return positionCopy
+	return numberCopy
+}
+
+func constructPosition(r Number, prevPos, afterPos Position, site int) Position {
+	var res Position;
+
+	for i, digit := range r {
+		var s int
+		
+		if i == len(r) - 1 {
+			s = site
+		} else if i < len(prevPos) && digit == prevPos[i].pos {
+			s = prevPos[i].site
+		} else if i < len(afterPos) && digit == afterPos[i].pos{
+			s = afterPos[i].site
+		} else {
+			s = site
+		}
+
+		res = append(res, Identifier{digit, s})
+	}
+
+	return res
 }
 
 func AllocPosition(prevPos Position, afterPos Position, site int) Position {
@@ -58,13 +80,12 @@ func AllocPosition(prevPos Position, afterPos Position, site int) Position {
 	interval := 0
 	for interval < 1 {
 		index++
-		interval = NumberToInt(PositionSubtract(prefix(afterPos, index), prefix(prevPos, index))) - 1
+		interval = NumberToInt(NumberSubtract(prefix(afterPos, index), prefix(prevPos, index))) - 1
 	}
 	step := utils.Min(BASE, interval)
 
-	position := prefix(prevPos, index)
-	position[len(position)-1].pos = utils.RandBetween(0, step) + 1
-	position[len(position)-1].site = site
+	r := prefix(prevPos, index)
+	position := constructPosition(NumberAdd(r, Number{utils.RandBetween(0, step) + 1}), prevPos, afterPos, site)
 
 	return position
 }

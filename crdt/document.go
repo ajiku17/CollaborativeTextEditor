@@ -1,9 +1,10 @@
 package crdt
 
 import (
-	"fmt"
-	"math"
+	"log"
 )
+
+const base = 10
 
 type Element struct {
 	data     string
@@ -14,9 +15,10 @@ type Document []Element
 
 func NewDocument() *Document {
 	doc := new(Document)
-	fmt.Printf("%v", doc)
-	doc = doc.docInsert(0, Element{"", Position{Identifier{0, math.MaxInt64}}})
-	doc = doc.docInsert(0, Element{"", Position{Identifier{0, 0}}})
+	NumberSetBase(base)
+	
+	doc.docInsert(0, Element{"", Position{Identifier{base, 0}}})
+	doc.docInsert(0, Element{"", Position{Identifier{0, 0}}})
 	return doc
 }
 
@@ -24,26 +26,55 @@ func (doc *Document) GetLength() int {
 	return len(*doc)
 }
 
-func (doc *Document) docInsert(index int, elem Element) *Document {
-	copyDoc := *doc
-	doc = new(Document)
-	(*doc) = append(*doc, copyDoc[:index]...)
-	(*doc) = append(*doc, elem)
-	(*doc) = append(*doc, copyDoc[index:]...)
-	return doc
+func (doc *Document) docInsert(index int, elem Element) {
+	if index < 0 || index > len(*doc) {
+		log.Fatal("Document: invalid insert index")
+	}
+
+	copyDoc := Document{}
+
+	copyDoc = append(copyDoc, (*doc)[:index]...)
+	copyDoc = append(copyDoc, elem)
+	copyDoc = append(copyDoc, (*doc)[index:]...)
+	
+	*doc = copyDoc[:]
+}
+
+func (doc *Document) docDelete(index int) {
+	if index < 0 || index > len(*doc) {
+		log.Fatal("Document: invalid insert index")
+	}
+
+	copyDoc := Document{}
+
+	copyDoc = append(copyDoc, (*doc)[:index]...)
+	copyDoc = append(copyDoc, (*doc)[index + 1:]...)
+	
+	*doc = copyDoc[:]
 }
 
 func (doc *Document) InsertAt(val string, index, site int) {
+	if index < 0 || index > len(*doc) - 2 {
+		log.Fatalf("Document: invalid insert index %v", index)
+	}
+
+	if len(*doc) < 2 {
+		log.Fatal("Document: invalid document")
+	}
+
 	prevPos := ((*doc)[index]).position
-	afterPos := ((*doc)[index+1]).position
+	afterPos := ((*doc)[index + 1]).position
 	position := AllocPosition(prevPos, afterPos, site)
-	// fmt.Printf("%v", position)
-	doc.docInsert(index, Element{val, position})
+	doc.docInsert(index + 1, Element{val, position})
 
 }
 
 func (doc *Document) DeleteAt(index int) {
+	if index < 0 || index > len(*doc) - 2 {
+		log.Fatalf("Document: invalid delete index %v", index)
+	}
 
+	doc.docDelete(index + 1)
 }
 
 func (elem *Element) ToString() string {
@@ -51,10 +82,9 @@ func (elem *Element) ToString() string {
 }
 
 func (doc *Document) ToString() string {
-	res := "Document : {"
+	res := ""
 	for i := 0; i < len(*doc); i++ {
-		res += "[element - " + (*doc)[i].ToString() + "]"
+		res += (*doc)[i].data
 	}
-	res += "}"
 	return res
 }
