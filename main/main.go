@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"reflect"
+	"testing"
 
 	"github.com/crdt"
 )
@@ -22,4 +24,17 @@ func main() {
 	doc.InsertAt("d", 10, 1)
 
 	fmt.Println(doc.ToString())
+
+	result := testing.Benchmark(func(parentB *testing.B) {
+		parentB.Run("example", func(b *testing.B) {
+			fmt.Printf("ok")
+		})
+	})
+
+	fmt.Printf("%v", result)
+
+	empty_benchmark := testing.BenchmarkResult{}
+	if reflect.DeepEqual(result, empty_benchmark) {
+		fmt.Printf("aaa")
+	}
 }

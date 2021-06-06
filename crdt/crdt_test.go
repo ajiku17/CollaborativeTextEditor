@@ -3,6 +3,8 @@ package crdt
 import (
 	"reflect"
 	"testing"
+
+	"github.com/utils"
 )
 
 func LongsEqual(t *testing.T, expected, actual int) {
@@ -227,7 +229,7 @@ func TestConstructPosition(t *testing.T) {
 	for i := 0; i < len(prevPos); i++ {
 		AssertTrue(t, prevPos[i].pos == newPos[i].pos && prevPos[i].site == newPos[i].site)
 	}
-	AssertTrue(t, newPos[len(newPos) - 1].pos == 4 && newPos[len(newPos) - 1].site == 8)
+	AssertTrue(t, newPos[len(newPos)-1].pos == 4 && newPos[len(newPos)-1].site == 8)
 }
 
 func TestPositionAllocation(t *testing.T) {
@@ -243,9 +245,9 @@ func TestPositionAllocation(t *testing.T) {
 
 	AssertTrue(t, len(newPosition) == 1)
 	AssertTrue(t, IsLessThan(PositionToNumber(prevPos), PositionToNumber(newPosition)))
-	AssertTrue(t, newPosition[len(newPosition) - 1].site == 4)
-	AssertTrue(t, newPosition[len(newPosition) - 1].pos > 7)
-	AssertTrue(t, newPosition[len(newPosition) - 1].pos < 10)
+	AssertTrue(t, newPosition[len(newPosition)-1].site == 4)
+	AssertTrue(t, newPosition[len(newPosition)-1].pos > 7)
+	AssertTrue(t, newPosition[len(newPosition)-1].pos < 10)
 
 	// #2
 	NumberSetBase(10)
@@ -265,8 +267,8 @@ func TestPositionAllocation(t *testing.T) {
 
 	AssertTrue(t, len(newPosition) == 4)
 	AssertTrue(t, IsLessThan(PositionToNumber(prevPos), PositionToNumber(newPosition)))
-	AssertTrue(t, newPosition[len(newPosition) - 1].site == 9)
-	AssertTrue(t, newPosition[len(newPosition) - 1].pos < 10)
+	AssertTrue(t, newPosition[len(newPosition)-1].site == 9)
+	AssertTrue(t, newPosition[len(newPosition)-1].pos < 10)
 }
 
 func TestDocInsert(t *testing.T) {
@@ -287,7 +289,7 @@ func TestDocInsert(t *testing.T) {
 	AssertTrue(t, (*document)[2].position[0].site == 5)
 
 	// Insert at the end
-	 document.docInsert(3, Element{"end", Position{Identifier{0, 7}}})
+	document.docInsert(3, Element{"end", Position{Identifier{0, 7}}})
 	AssertTrue(t, document.GetLength() == 4)
 	AssertTrue(t, (*document)[3].data == "end")
 }
@@ -300,58 +302,52 @@ func TestDocCreation(t *testing.T) {
 	AssertTrue(t, (*document)[1].position[0].pos == 10)
 }
 
+func InsertAtTop(text string) *Document {
+	document := NewDocument()
+	for _, character := range text {
+		document.InsertAt(string(character), 0, utils.RandBetween(1, 5))
+	}
+	return document
+}
+
+func InsertAtBottom(text string) *Document {
+	document := NewDocument()
+	for index, character := range text {
+		document.InsertAt(string(character), index, utils.RandBetween(1, 5))
+	}
+	return document
+}
+
 func TestDocumentInsertAt(t *testing.T) {
 
 	// #1
-	document := NewDocument()
-	document.InsertAt("H", 0, 1)
-	document.InsertAt("i", 1, 4)
-	document.InsertAt(" ", 2, 1)
-	document.InsertAt("e", 3, 4)
-	document.InsertAt("v", 4, 1)
-	document.InsertAt("e", 5, 4)
-	document.InsertAt("r", 6, 1)
-	document.InsertAt("y", 7, 4)
-	document.InsertAt("o", 8, 1)
-	document.InsertAt("n", 9, 4)
-	document.InsertAt("e", 10, 1)
-	document.InsertAt("!", 11, 1)
-	AssertTrue(t, document.ToString() == "Hi everyone!")
+	text := "Hi everyone!"
+	document := InsertAtBottom(text)
+	AssertTrue(t, document.ToString() == text)
 
 	// #2
+	text = "Hello again!"
+	document = InsertAtTop(utils.Reverse(text))
+	AssertTrue(t, document.ToString() == text)
+
+	// #3
+	text = "Hello!"
 	document = NewDocument()
-	document.InsertAt("!", 0, 1)
-	document.InsertAt("n", 0, 4)
-	document.InsertAt("i", 0, 1)
-	document.InsertAt("a", 0, 4)
-	document.InsertAt("g", 0, 1)
-	document.InsertAt("a", 0, 4)
-	document.InsertAt(" ", 0, 1)
-	document.InsertAt("o", 0, 4)
-	document.InsertAt("l", 0, 1)
-	document.InsertAt("l", 0, 4)
 	document.InsertAt("e", 0, 1)
-	document.InsertAt("H", 0, 1)
-	AssertTrue(t, document.ToString() == "Hello again!")
+	document.InsertAt("l", 1, 4)
+	document.InsertAt("o", 2, 3)
+	document.InsertAt("l", 1, 1)
+	document.InsertAt("!", 4, 2)
+	document.InsertAt("H", 0, 4)
+	AssertTrue(t, document.ToString() == text)
 }
 
 func TestDocumentDeleteAt(t *testing.T) {
 
 	// #1
-	document := NewDocument()
-	document.InsertAt("H", 0, 1)
-	document.InsertAt("i", 1, 4)
-	document.InsertAt(" ", 2, 1)
-	document.InsertAt("e", 3, 4)
-	document.InsertAt("v", 4, 1)
-	document.InsertAt("e", 5, 4)
-	document.InsertAt("r", 6, 1)
-	document.InsertAt("y", 7, 4)
-	document.InsertAt("o", 8, 1)
-	document.InsertAt("n", 9, 4)
-	document.InsertAt("e", 10, 1)
-	document.InsertAt("!", 11, 1)
-	AssertTrue(t, document.ToString() == "Hi everyone!")
+	text := "Hi everyone!"
+	document := InsertAtBottom(text)
+	AssertTrue(t, document.ToString() == text)
 
 	document.DeleteAt(0)
 	document.DeleteAt(0)
