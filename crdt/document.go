@@ -5,7 +5,7 @@ import (
 	"math"
 )
 
-const base = 10
+const base = math.MaxInt32
 
 type Element struct {
 	data     string
@@ -18,7 +18,7 @@ func NewDocument() *Document {
 	doc := new(Document)
 	NumberSetBase(base)
 	
-	doc.docInsert(0, Element{"", Position{Identifier{math.MaxInt32, 0}}})
+	doc.docInsert(0, Element{"", Position{Identifier{base, 0}}})
 	doc.docInsert(0, Element{"", Position{Identifier{0, 0}}})
 	return doc
 }

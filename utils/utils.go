@@ -1,13 +1,15 @@
 package utils
 
-import "math/rand"
+import (
+	"math/rand"
+)
 
 func SetRandSeed(seed int64) {
 	rand.Seed(seed)
 }
 
 func RandBetween(low, high int) int {
-	return rand.Intn(high-low) + low
+	return rand.Intn(high - low) + low
 }
 
 func Min(x, y int) int {
