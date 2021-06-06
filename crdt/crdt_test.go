@@ -1,6 +1,7 @@
 package crdt
 
 import (
+	"math"
 	"reflect"
 	"testing"
 )
@@ -152,6 +153,70 @@ func TestPositionToNumber(t *testing.T) {
 	AssertTrue(t, reflect.DeepEqual(number, expected))
 }
 
+func TestPositionIsGreaterOrEqual(t *testing.T) {
+	var position1, position2 Position
+
+	// #1
+	NumberSetBase(10)
+	position1 = append(position1, Identifier{3, 2})
+	position1 = append(position1, Identifier{8, 2})
+
+	position2 = append(position2, Identifier{9, 5})
+	position2 = append(position2, Identifier{8, 1})
+
+	AssertTrue(t, !PositionIsGreaterOrEqual(position1, position2))
+	AssertTrue(t, PositionIsGreaterOrEqual(position2, position1))
+
+	// #2
+	NumberSetBase(64)
+	position1 = Position{}
+	position1 = append(position1, Identifier{3, 2})
+	position1 = append(position1, Identifier{8, 7})
+
+	position2 = Position{}
+	position2 = append(position2, Identifier{3, 2})
+	position2 = append(position2, Identifier{8, 7})
+
+	AssertTrue(t, !PositionIsLessThan(position1, position2))
+	AssertTrue(t, !PositionIsLessThan(position2, position1))
+
+	position2 = append(position2, Identifier{1, 2})
+	AssertTrue(t, PositionIsGreaterOrEqual(position2, position1))
+	AssertTrue(t, !PositionIsGreaterOrEqual(position1, position2))
+}
+
+func TestPositionIsLessThan(t *testing.T) {
+	var position1, position2 Position
+
+	// #1
+	NumberSetBase(10)
+	position1 = append(position1, Identifier{3, 2})
+	position1 = append(position1, Identifier{8, 2})
+
+	position2 = append(position2, Identifier{9, 5})
+	position2 = append(position2, Identifier{8, 1})
+
+	AssertTrue(t, PositionIsLessThan(position1, position2))
+	AssertTrue(t, !PositionIsLessThan(position2, position1))
+
+	// #2
+	NumberSetBase(64)
+	position1 = Position{}
+	position1 = append(position1, Identifier{3, 2})
+	position1 = append(position1, Identifier{8, 7})
+
+	position2 = Position{}
+	position2 = append(position2, Identifier{3, 2})
+	position2 = append(position2, Identifier{8, 7})
+
+	AssertTrue(t, !PositionIsLessThan(position1, position2))
+	AssertTrue(t, !PositionIsLessThan(position2, position1))
+
+	position2 = append(position2, Identifier{1, 2})
+	AssertTrue(t, PositionIsLessThan(position1, position2))
+	AssertTrue(t, !PositionIsLessThan(position2, position1))
+}
+
 func TestPositionSubtract(t *testing.T) {
 	var position1, position2 Position
 
@@ -274,30 +339,74 @@ func TestDocInsert(t *testing.T) {
 
 	// Insert at the beginning
 	document.docInsert(0, Element{"data", nil})
-	AssertTrue(t, document.GetLength() == 1)
+	AssertTrue(t, len(*document) == 1)
 
 	document.docInsert(1, Element{"data1", Position{Identifier{0, 5}}})
-	AssertTrue(t, document.GetLength() == 2)
+	AssertTrue(t, len(*document) == 2)
 	AssertTrue(t, (*document)[1].position[0].site == 5)
 
 	// Insert in the middle
 	document.docInsert(1, Element{"data2", Position{Identifier{0, 7}}})
-	AssertTrue(t, document.GetLength() == 3)
+	AssertTrue(t, len(*document) == 3)
 	AssertTrue(t, (*document)[1].position[0].site == 7)
 	AssertTrue(t, (*document)[2].position[0].site == 5)
 
 	// Insert at the end
-	 document.docInsert(3, Element{"end", Position{Identifier{0, 7}}})
-	AssertTrue(t, document.GetLength() == 4)
+	document.docInsert(3, Element{"end", Position{Identifier{0, 7}}})
+	AssertTrue(t, len(*document) == 4)
 	AssertTrue(t, (*document)[3].data == "end")
+}
+
+func TestDocDelete(t *testing.T) {
+	document := new(Document)
+
+	// Insert at the beginning
+	document.docInsert(0, Element{"begin", nil})
+	AssertTrue(t, len(*document) == 1)
+
+	document.docInsert(1, Element{"data1", Position{Identifier{0, 5}}})
+	AssertTrue(t, len(*document) == 2)
+	AssertTrue(t, (*document)[1].position[0].site == 5)
+
+	// Insert in the middle
+	document.docInsert(1, Element{"data2", Position{Identifier{0, 6}}})
+	AssertTrue(t, len(*document) == 3)
+	AssertTrue(t, (*document)[1].position[0].site == 6)
+	AssertTrue(t, (*document)[2].position[0].site == 5)
+
+	// Insert at the end
+	document.docInsert(3, Element{"end", Position{Identifier{0, 7}}})
+	AssertTrue(t, len(*document) == 4)
+	AssertTrue(t, (*document)[3].data == "end")
+
+	document.docDelete(2);
+	AssertTrue(t, len(*document) == 3)
+	AssertTrue(t, (*document)[2].data == "end")
+	AssertTrue(t, len((*document)[2].position) == 1)
+	AssertTrue(t, IdentifierEquals((*document)[2].position[0], Identifier{0, 7}))
+
+	document.docDelete(0);
+	AssertTrue(t, len(*document) == 2)
+	AssertTrue(t, (*document)[0].data == "data2")
+	AssertTrue(t, len((*document)[0].position) == 1)
+	AssertTrue(t, IdentifierEquals((*document)[0].position[0], Identifier{0, 6}))
+
+	document.docDelete(1);
+	AssertTrue(t, len(*document) == 1)
+	AssertTrue(t, (*document)[0].data == "data2")
+	AssertTrue(t, len((*document)[0].position) == 1)
+	AssertTrue(t, IdentifierEquals((*document)[0].position[0], Identifier{0, 6}))
+
+	document.docDelete(0);
+	AssertTrue(t, len(*document) == 0)
 }
 
 func TestDocCreation(t *testing.T) {
 	document := NewDocument()
 
-	AssertTrue(t, document.GetLength() == 2)
+	AssertTrue(t, len(*document) == 2)
 	AssertTrue(t, (*document)[0].position[0].pos == 0)
-	AssertTrue(t, (*document)[1].position[0].pos == 10)
+	AssertTrue(t, (*document)[1].position[0].pos == math.MaxInt32)
 }
 
 func TestDocumentInsertAt(t *testing.T) {
@@ -351,10 +460,12 @@ func TestDocumentDeleteAt(t *testing.T) {
 	document.InsertAt("n", 9, 4)
 	document.InsertAt("e", 10, 1)
 	document.InsertAt("!", 11, 1)
+	AssertTrue(t, document.GetLength() == 12)
 	AssertTrue(t, document.ToString() == "Hi everyone!")
 
 	document.DeleteAt(0)
 	document.DeleteAt(0)
+	AssertTrue(t, document.GetLength() == 10)
 	AssertTrue(t, document.ToString() == " everyone!")
 
 	document.InsertAt("H", 0, 4)
@@ -362,5 +473,160 @@ func TestDocumentDeleteAt(t *testing.T) {
 	document.InsertAt("l", 2, 4)
 	document.InsertAt("l", 3, 1)
 	document.InsertAt("o", 4, 1)
+	AssertTrue(t, document.GetLength() == 15)
 	AssertTrue(t, document.ToString() == "Hello everyone!")
+
+	// #2
+	document = NewDocument()
+	document.InsertAt("H", 0, 1)
+	document.InsertAt("i", 1, 4)
+	document.InsertAt(" ", 2, 1)
+	document.InsertAt("e", 3, 4)
+	document.InsertAt("v", 4, 1)
+	document.InsertAt("e", 5, 4)
+	document.InsertAt("r", 6, 1)
+	document.InsertAt("y", 7, 4)
+	document.InsertAt("o", 8, 1)
+	document.InsertAt("n", 9, 4)
+	document.InsertAt("e", 10, 1)
+	document.InsertAt("!", 11, 1)
+	AssertTrue(t, document.GetLength() == 12)
+	AssertTrue(t, document.ToString() == "Hi everyone!")
+
+	document.DeleteAt(3)
+	document.DeleteAt(3)
+	document.DeleteAt(3)
+	document.DeleteAt(3)
+	document.DeleteAt(3)
+	document.DeleteAt(3)
+	document.DeleteAt(3)
+	document.DeleteAt(3)
+	AssertTrue(t, document.GetLength() == 4)
+	AssertTrue(t, document.ToString() == "Hi !")
+
+	document.InsertAt("f", 3, 4)
+	document.InsertAt("o", 4, 1)
+	document.InsertAt("l", 5, 4)
+	document.InsertAt("k", 6, 1)
+	document.InsertAt("s", 7, 1)
+	AssertTrue(t, document.GetLength() == 9)
+	AssertTrue(t, document.ToString() == "Hi folks!")
+}
+
+func TestDocInsertAtPos(t *testing.T) {
+	// #1
+	document := NewDocument()
+
+	document.InsertAtPos(Position{Identifier{1, 1}}, "H")
+	document.InsertAtPos(Position{Identifier{2, 1}}, "i")
+	document.InsertAtPos(Position{Identifier{3, 1}}, " ")
+	document.InsertAtPos(Position{Identifier{4, 1}}, "e")
+	document.InsertAtPos(Position{Identifier{5, 1}}, "v")
+	document.InsertAtPos(Position{Identifier{6, 1}}, "e")
+	document.InsertAtPos(Position{Identifier{7, 1}}, "r")
+	document.InsertAtPos(Position{Identifier{8, 1}}, "y")
+	document.InsertAtPos(Position{Identifier{9, 1}}, "o")
+	document.InsertAtPos(Position{Identifier{10, 1}}, "n")
+	document.InsertAtPos(Position{Identifier{11, 1}}, "e")
+	document.InsertAtPos(Position{Identifier{12, 1}}, "!")
+	AssertTrue(t, document.GetLength() == 12)
+	AssertTrue(t, document.ToString() == "Hi everyone!")
+
+	// #2
+	document = NewDocument()
+
+	document.InsertAtPos(Position{Identifier{4, 1}}, "e")
+	document.InsertAtPos(Position{Identifier{1, 1}}, "H")
+	document.InsertAtPos(Position{Identifier{8, 1}}, "y")
+	document.InsertAtPos(Position{Identifier{9, 1}}, "o")
+	document.InsertAtPos(Position{Identifier{7, 1}}, "r")
+	document.InsertAtPos(Position{Identifier{6, 1}}, "e")
+	document.InsertAtPos(Position{Identifier{2, 1}}, "i")
+	document.InsertAtPos(Position{Identifier{3, 1}}, " ")
+	document.InsertAtPos(Position{Identifier{5, 1}}, "v")
+	document.InsertAtPos(Position{Identifier{12, 1}}, "!")
+	document.InsertAtPos(Position{Identifier{10, 1}}, "n")
+	document.InsertAtPos(Position{Identifier{11, 1}}, "e")
+	AssertTrue(t, document.GetLength() == 12)
+	AssertTrue(t, document.ToString() == "Hi everyone!")
+
+	// #3
+	document = NewDocument()
+
+	document.InsertAtPos(Position{Identifier{1, 1}}, "H")
+	document.InsertAtPos(Position{Identifier{1, 1}, Identifier{1, 1}}, "e")
+	document.InsertAtPos(Position{Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}}, "l")
+	document.InsertAtPos(Position{Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}}, "l")
+	document.InsertAtPos(Position{Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}}, "o")
+	document.InsertAtPos(Position{Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}}, "!")
+	AssertTrue(t, document.GetLength() == 6)
+	AssertTrue(t, document.ToString() == "Hello!")
+
+	// #4
+	document = NewDocument()
+
+	document.InsertAtPos(Position{Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}}, "l")
+	document.InsertAtPos(Position{Identifier{1, 1}}, "H")
+	document.InsertAtPos(Position{Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}}, "!")
+	document.InsertAtPos(Position{Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}}, "l")
+	document.InsertAtPos(Position{Identifier{1, 1}, Identifier{1, 1}}, "e")
+	document.InsertAtPos(Position{Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}}, "o")
+	AssertTrue(t, document.GetLength() == 6)
+	AssertTrue(t, document.ToString() == "Hello!")
+}
+
+func TestDocDeleteAtPos(t *testing.T) {
+	document := NewDocument()
+
+	// #1
+	document.InsertAtPos(Position{Identifier{1, 1}}, "H")
+	document.InsertAtPos(Position{Identifier{2, 1}}, "i")
+	document.InsertAtPos(Position{Identifier{3, 1}}, " ")
+	document.InsertAtPos(Position{Identifier{4, 1}}, "e")
+	document.InsertAtPos(Position{Identifier{5, 1}}, "v")
+	document.InsertAtPos(Position{Identifier{6, 1}}, "e")
+	document.InsertAtPos(Position{Identifier{7, 1}}, "r")
+	document.InsertAtPos(Position{Identifier{8, 1}}, "y")
+	document.InsertAtPos(Position{Identifier{9, 1}}, "o")
+	document.InsertAtPos(Position{Identifier{10, 1}}, "n")
+	document.InsertAtPos(Position{Identifier{11, 1}}, "e")
+	document.InsertAtPos(Position{Identifier{12, 1}}, "!")
+	AssertTrue(t, document.GetLength() == 12)
+	AssertTrue(t, document.ToString() == "Hi everyone!")
+
+	document.DeleteAtPos(Position{Identifier{4, 1}})
+	document.DeleteAtPos(Position{Identifier{6, 1}})
+	document.DeleteAtPos(Position{Identifier{10, 1}})
+	document.DeleteAtPos(Position{Identifier{7, 1}})
+	document.DeleteAtPos(Position{Identifier{5, 1}})
+	document.DeleteAtPos(Position{Identifier{3, 1}})
+	document.DeleteAtPos(Position{Identifier{11, 1}})
+	document.DeleteAtPos(Position{Identifier{8, 1}})
+	document.DeleteAtPos(Position{Identifier{9, 1}})
+	AssertTrue(t, document.GetLength() == 3)
+	AssertTrue(t, document.ToString() == "Hi!")
+
+	// #2
+	document = NewDocument()
+
+	document.InsertAtPos(Position{Identifier{1, 1}}, "H")
+	document.InsertAtPos(Position{Identifier{1, 1}, Identifier{1, 1}}, "e")
+	document.InsertAtPos(Position{Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}}, "l")
+	document.InsertAtPos(Position{Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}}, "l")
+	document.InsertAtPos(Position{Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}}, "o")
+	document.InsertAtPos(Position{Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}}, "!")
+	AssertTrue(t, document.GetLength() == 6)
+	AssertTrue(t, document.ToString() == "Hello!")
+
+	document.DeleteAtPos(Position{Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}})
+	document.DeleteAtPos(Position{Identifier{1, 1}})
+	document.DeleteAtPos(Position{Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}})
+	AssertTrue(t, document.GetLength() == 3)
+	AssertTrue(t, document.ToString() == "elo")
+
+	document.DeleteAtPos(Position{Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}})
+	document.DeleteAtPos(Position{Identifier{1, 1}, Identifier{1, 1}})
+	document.DeleteAtPos(Position{Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}, Identifier{1, 1}})
+	AssertTrue(t, document.GetLength() == 0)
+	AssertTrue(t, document.ToString() == "")
 }

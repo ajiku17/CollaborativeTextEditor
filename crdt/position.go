@@ -19,9 +19,65 @@ func PositionToNumber(pos Position) Number {
 	return num
 }
 
+func IdentifierEquals(id1, id2 Identifier) bool {
+	return id1.pos == id2.pos && id1.site == id2.site
+}
+
+func IdentifierIsGreaterOrEqual(id1, id2 Identifier) bool {
+	if id1.pos == id2.pos {
+		return id1.site >= id2.site
+	}
+
+	return id1.pos >= id2.pos
+}
+
+func IdentifierIsLessThan(id1, id2 Identifier) bool {
+	return !IdentifierIsGreaterOrEqual(id1, id2)
+}
+ 
+func PositionEquals(pos1, pos2 Position) bool {
+	if (len(pos1) != len(pos2)) {
+		return false
+	}
+
+	for i := 0; i < len(pos1); i++ {
+		if !IdentifierEquals(pos1[i], pos2[i]) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func PositionIsGreaterOrEqual(pos1, pos2 Position) bool {
+	for i := 0; i < utils.Max(len(pos1), len(pos2)); i++ {
+		var id1, id2 Identifier
+
+		if i >= len(pos1) {
+			id1 = Identifier{}
+		} else {
+			id1 = pos1[i]
+		}
+
+		if i >= len(pos2) {
+			id2 = Identifier{}
+		} else {
+			id2 = pos2[i]
+		}
+
+		if !IdentifierEquals(id1, id2) {
+			return IdentifierIsGreaterOrEqual(id1, id2)
+		}
+	}
+
+	return true
+}
+
+func PositionIsLessThan(pos1, pos2 Position) bool {
+	return !PositionIsGreaterOrEqual(pos1, pos2)
+}
+
 func PositionSubtract(pos1, pos2 Position) Number {
-	// fmt.Printf("%v\n", pos1)
-	// fmt.Printf("%v\n", pos2)
 	num1 := PositionToNumber(pos1)
 	num2 := PositionToNumber(pos2)
 
@@ -89,3 +145,5 @@ func AllocPosition(prevPos Position, afterPos Position, site int) Position {
 
 	return position
 }
+
+
