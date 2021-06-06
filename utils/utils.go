@@ -25,3 +25,11 @@ func Max(x, y int) int {
 
 	return x
 }
+
+func Reverse(s string) string {
+	result := ""
+	for _, ch := range s {
+		result = string(ch) + result
+	}
+	return result
+}
