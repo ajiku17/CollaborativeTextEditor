@@ -1,6 +1,10 @@
 package crdt
 
 import (
+	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/utils"
 )
 
@@ -10,6 +14,33 @@ type Identifier struct {
 }
 
 type Position []Identifier
+
+func (pos *Position)ToString() string {
+	res := ""
+	for _, identifier := range *pos {
+		res += fmt.Sprintf("(%d,%d)", identifier.pos, identifier.site)
+	}
+	return res
+}
+
+func ToPosition(position string) Position  {
+	result_position := new(Position)
+	i := 0
+	for i < len(position) {
+		if position[i] == '(' {
+			pos, _ := strconv.Atoi(position[1:strings.Index(position, ",")])
+			position = position[strings.Index(position, ",") + 1:]
+			site, _ := strconv.Atoi(position[:strings.Index(position, ")")])
+			position = position[strings.Index(position, ")"):]
+			identifier := Identifier{pos, site}
+			*result_position = append(*result_position, identifier)
+			position = position[1:]
+		} else {
+			i ++
+		}
+	}
+	return *result_position
+}
 
 func PositionToNumber(pos Position) Number {
 	num := make(Number, len(pos))

@@ -1,40 +1,35 @@
 package main
 
 import (
-	"fmt"
-	"reflect"
-	"testing"
-
 	"github.com/crdt"
 )
 
+
+
 func main() {
-	doc := crdt.NewDocument()
+	server := NewServer()
+	go server.HandleRequests()
 
-	doc.InsertAt("H", 0, 1)
-	doc.InsertAt("e", 1, 1)
-	doc.InsertAt("l", 2, 1)
-	doc.InsertAt("l", 3, 1)
-	doc.InsertAt("o", 4, 1)
-	doc.InsertAt(" ", 5, 1)
-	doc.InsertAt("W", 6, 1)
-	doc.InsertAt("o", 7, 1)
-	doc.InsertAt("r", 8, 1)
-	doc.InsertAt("l", 9, 1)
-	doc.InsertAt("d", 10, 1)
+	// doc.InsertAt("H", 0, 1)
+	client1 := crdt.NewClient(1)
+	client2 := crdt.NewClient(2)
+	server.ConnectWithClient(client1)
+	server.ConnectWithClient(client2)
 
-	fmt.Println(doc.ToString())
+	client1.Insert("H", 0)
+	client2.Insert("e", 1)
+	
+	client1.Insert("l", 2)
+	client1.Insert("l", 3)
+	client2.Insert("o", 4)
+	client2.Insert(" ", 5)
+	client2.Insert("W", 6)
+	client1.Insert("o", 7)
+	client1.Insert("r", 8)
+	client1.Insert("l", 9)
+	client1.Delete(9)
+	client2.Insert("d", 9)
 
-	result := testing.Benchmark(func(parentB *testing.B) {
-		parentB.Run("example", func(b *testing.B) {
-			fmt.Printf("ok")
-		})
-	})
-
-	fmt.Printf("%v", result)
-
-	empty_benchmark := testing.BenchmarkResult{}
-	if reflect.DeepEqual(result, empty_benchmark) {
-		fmt.Printf("aaa")
-	}
+	client1.PrintDocument()
+	client2.PrintDocument()
 }

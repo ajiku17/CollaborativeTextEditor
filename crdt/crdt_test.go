@@ -626,3 +626,19 @@ func TestDocDeleteAtPos(t *testing.T) {
 	AssertTrue(t, document.GetLength() == 0)
 	AssertTrue(t, document.ToString() == "")
 }
+
+func TestPositionConvertion(t *testing.T) {
+	str := "(1298498082,1)"
+	position := ToPosition(str)
+	AssertTrue(t, position.ToString() == str)
+
+	
+	str = "(1298498082,1)(123,6)"
+	position = ToPosition(str)
+	AssertTrue(t, position.ToString() == str)
+
+	
+	str = ""
+	position = ToPosition(str)
+	AssertTrue(t, position.ToString() == str)
+}
