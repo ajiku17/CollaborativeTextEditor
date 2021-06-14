@@ -4,7 +4,7 @@ import "log"
 
 type Element struct {
 	data     string
-	position interface{}
+	position Position
 }
 
 type BasicDocument struct {
@@ -25,7 +25,7 @@ func (doc *BasicDocument) DocumentInit(positionManager PositionManager) {
 }
 
 
-func (doc *BasicDocument) InsertAtIndex(val string, index, site int) interface{} {
+func (doc *BasicDocument) InsertAtIndex(val string, index, site int) Position {
 	if index < 0 || index > len(doc.elems) - 2 {
 		log.Fatalf("Document: invalid insert index %v", index)
 	}
@@ -72,7 +72,7 @@ func (doc *BasicDocument) docInsert(index int, elem Element) {
 	doc.elems = copyElems[:]
 }
 
-func (doc *BasicDocument) docDelete(index int) interface{} {
+func (doc *BasicDocument) docDelete(index int) Position {
 	if index < 0 || index > len(doc.elems) {
 		log.Fatalf("Document: invalid insert index %v", index)
 	}
@@ -88,7 +88,7 @@ func (doc *BasicDocument) docDelete(index int) interface{} {
 	return removedPos
 }
 
-func (doc *BasicDocument) InsertAtPosition(pos interface{}, val string) {
+func (doc *BasicDocument) InsertAtPosition(pos Position, val string) {
 	var index int
 	copyDoc := []Element{}
 
@@ -107,7 +107,7 @@ func (doc *BasicDocument) InsertAtPosition(pos interface{}, val string) {
 	doc.elems = copyDoc[:]
 }
 
-func (doc *BasicDocument) DeleteAtPosition (pos interface{}) {
+func (doc *BasicDocument) DeleteAtPosition (pos Position) {
 	var index int
 	copyDoc := []Element{}
 
