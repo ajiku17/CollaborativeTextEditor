@@ -1,4 +1,4 @@
-package crdt
+package client
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/crdt"
 	"github.com/utils"
 )
 
@@ -26,12 +27,12 @@ type Response struct {
 	Status int    `json:"status"`
 }
 
-func (client *ClientServer) SendInsertRequest(position Position, val string, site int) int {
+func (client *ClientServer) SendInsertRequest(position crdt.Position, val string, site int) int {
 	jsonStr := utils.ToJson(Request{"1", site, position.ToString(), val})
 	return client.sendRequest(bytes.NewBuffer(jsonStr), "Insert")
 }
 
-func (client *ClientServer) SendDeleteRequest(position Position, site int) int {
+func (client *ClientServer) SendDeleteRequest(position crdt.Position, site int) int {
 	jsonStr := utils.ToJson(Request{"1", site, position.ToString(), ""})
 	return client.sendRequest(bytes.NewBuffer(jsonStr), "Delete")
 }

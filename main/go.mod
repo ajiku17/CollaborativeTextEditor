@@ -6,7 +6,10 @@ replace github.com/crdt => ../crdt
 
 replace github.com/utils => ../utils
 
+replace github.com/client => ../client
+
 require (
+	github.com/client v0.0.0-00010101000000-000000000000
 	github.com/crdt v0.0.0-00010101000000-000000000000
 	github.com/utils v0.0.0-00010101000000-000000000000
 )

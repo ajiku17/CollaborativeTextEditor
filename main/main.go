@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/crdt"
+	"github.com/client"
 )
 
 
@@ -11,8 +11,8 @@ func main() {
 	go server.HandleRequests()
 
 	// doc.InsertAt("H", 0, 1)
-	client1 := crdt.NewClient(1)
-	client2 := crdt.NewClient(2)
+	client1 := client.NewClient(1)
+	client2 := client.NewClient(2)
 	server.ConnectWithClient(client1)
 	server.ConnectWithClient(client2)
 
