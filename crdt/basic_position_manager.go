@@ -4,7 +4,7 @@ import (
 	"log"
 	"math"
 
-	"github.com/utils"
+	"github.com/ajiku17/CollaborativeTextEditor/utils"
 )
 
 const base = math.MaxInt32

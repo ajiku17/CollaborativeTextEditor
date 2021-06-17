@@ -3,7 +3,7 @@ package crdt
 import (
 	"fmt"
 
-	"github.com/utils"
+	"github.com/ajiku17/CollaborativeTextEditor/utils"
 )
 
 var BASE int

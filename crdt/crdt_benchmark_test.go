@@ -4,7 +4,7 @@ import (
 	"log"
 	"testing"
 
-	"github.com/utils"
+	"github.com/ajiku17/CollaborativeTextEditor/utils"
 )
 
 func DocumentInsertAtTop(b *testing.B, document Document, manager PositionManager) {

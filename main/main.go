@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/crdt"
+	"github.com/ajiku17/CollaborativeTextEditor/crdt"
 )
 
 func main() {
