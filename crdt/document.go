@@ -1,7 +1,6 @@
 package crdt
 
 type Document interface {
-	DocumentInit(PositionManager)
 	InsertAtIndex(string, int, int) Position
 	DeleteAtIndex(int)
 	InsertAtPosition(Position, string)

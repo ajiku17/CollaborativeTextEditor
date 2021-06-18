@@ -19,27 +19,24 @@ func InsertAtBottom(doc Document, text string) {
 	}
 }
 
-func DocumentInsertAtIndex(t *testing.T, document Document, manager PositionManager) {
+func DocumentInsertAtIndex(t *testing.T, newDocumentInstance func () Document) {
 	
 	// #1
-	manager.PositionManagerInit()
-	document.DocumentInit(manager)
+	document := newDocumentInstance()
 
 	text := "Hi everyone!"
 	InsertAtBottom(document, text)
 	AssertTrue(t, document.ToString() == text)
 
 	// #2
-	manager.PositionManagerInit()
-	document.DocumentInit(manager)
+	document = newDocumentInstance()
 	
 	text = "Hello again!"
 	InsertAtTop(document, utils.Reverse(text))
 	AssertTrue(t, document.ToString() == text)
 
 	// #3
-	manager.PositionManagerInit()
-	document.DocumentInit(manager)
+	document = newDocumentInstance()
 
 	text = "Hello!"
 	document.InsertAtIndex("e", 0, 1)
@@ -51,11 +48,10 @@ func DocumentInsertAtIndex(t *testing.T, document Document, manager PositionMana
 	AssertTrue(t, document.ToString() == text)
 }
 
-func DocumentDeleteAtIndex(t *testing.T, document Document, manager PositionManager) {
+func DocumentDeleteAtIndex(t *testing.T, newDocumentInstance func () Document) {
 
 	// #1
-	manager.PositionManagerInit()
-	document.DocumentInit(manager)
+	document := newDocumentInstance()
 
 	text := "Hi everyone!"
 	InsertAtBottom(document, text)
@@ -76,8 +72,7 @@ func DocumentDeleteAtIndex(t *testing.T, document Document, manager PositionMana
 	AssertTrue(t, document.ToString() == "Hello everyone!")
 
 	// #2
-	manager.PositionManagerInit()
-	document.DocumentInit(manager)
+	document = newDocumentInstance()
 
 	document.InsertAtIndex("H", 0, 1)
 	document.InsertAtIndex("i", 1, 4)
@@ -114,10 +109,10 @@ func DocumentDeleteAtIndex(t *testing.T, document Document, manager PositionMana
 	AssertTrue(t, document.ToString() == "Hi folks!")
 }
 
-func DocInsertAtPosition(t *testing.T, document Document, manager PositionManager) {
+func DocInsertAtPosition(t *testing.T, newDocumentInstance func () Document, newManagerInstance func () PositionManager) {
 	// #1
-	manager.PositionManagerInit()
-	document.DocumentInit(manager)
+	document := newDocumentInstance()
+	manager := newManagerInstance()
 
 	text := "Hi everyone!"
 	prev := manager.GetMinPosition()
@@ -145,8 +140,7 @@ func DocInsertAtPosition(t *testing.T, document Document, manager PositionManage
 	AssertTrue(t, document.ToString() == "Hi everyone!")
 
 	// #2
-	manager.PositionManagerInit()
-	document.DocumentInit(manager)
+	document = newDocumentInstance()
 
 	shuffled := positions[:]
 	for i := range shuffled {
@@ -164,9 +158,9 @@ func DocInsertAtPosition(t *testing.T, document Document, manager PositionManage
 	AssertTrue(t, document.ToString() == "Hi everyone!")
 }
 
-func DocDeleteAtPos(t *testing.T, document Document, manager PositionManager) {
-	manager.PositionManagerInit()
-	document.DocumentInit(manager)
+func DocDeleteAtPos(t *testing.T, newDocumentInstance func () Document, newManagerInstance func () PositionManager) {
+	document := newDocumentInstance()
+	manager := newManagerInstance()
 
 	// #1
 	text := "Hi everyone!"
@@ -219,27 +213,28 @@ func TestDocument(t *testing.T) {
 	} {
 		{ 
 			func() Document {
-				return new(BasicDocument)
-			}, 
+				return NewBasicDocument(NewBasicPositionManager())
+			},
 			func() PositionManager {
-				return new(BasicPositionManager)
-			}, 
-			"BasicDocument"},
+				return NewBasicPositionManager()
+			},
+			"BasicDocument",
+		},
 	}
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func (t *testing.T) {
 			t.Run("TestDocumentInsertAtIndex", func (t* testing.T) {
-				DocumentInsertAtIndex(t, impl.newDocumentInstance(), impl.newPositionManagerInstance())
+				DocumentInsertAtIndex(t, impl.newDocumentInstance)
 			})
 			t.Run("TestDocumentDeleteAtIndex", func (t* testing.T) {
-				DocumentDeleteAtIndex(t, impl.newDocumentInstance(), impl.newPositionManagerInstance())
+				DocumentDeleteAtIndex(t, impl.newDocumentInstance)
 			})
 			t.Run("TestDocInsertAtPosition", func (t* testing.T) {
-				DocInsertAtPosition(t, impl.newDocumentInstance(), impl.newPositionManagerInstance())
+				DocInsertAtPosition(t, impl.newDocumentInstance, impl.newPositionManagerInstance)
 			})
 			t.Run("TestDocDeleteAtPos", func (t* testing.T) {
-				DocDeleteAtPos(t, impl.newDocumentInstance(), impl.newPositionManagerInstance())
+				DocDeleteAtPos(t, impl.newDocumentInstance, impl.newPositionManagerInstance)
 			})
 		})
 	}

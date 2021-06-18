@@ -21,9 +21,12 @@ type BasicPositionManager struct {
 
 type BasicPosition []Identifier
 
-func (manager *BasicPositionManager) PositionManagerInit() {
+func NewBasicPositionManager() *BasicPositionManager{
+	manager := new(BasicPositionManager)
 	manager.base = base
 	NumberSetBase(manager.base)
+
+	return manager
 }
 
 func (manager *BasicPositionManager) GetMaxPosition() Position {

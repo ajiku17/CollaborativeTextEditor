@@ -9,12 +9,7 @@ import (
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-
-	doc := new(crdt.BasicDocument)
-	positionManager := new(crdt.BasicPositionManager)
-
-	positionManager.PositionManagerInit()
-	doc.DocumentInit(positionManager)
+	doc := crdt.NewBasicDocument(crdt.NewBasicPositionManager())
 
 	doc.InsertAtIndex("H", 0, 1)
 	doc.InsertAtIndex("e", 1, 1)

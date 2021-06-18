@@ -2,127 +2,42 @@ package crdt
 
 import (
 	"testing"
+
+	"github.com/ajiku17/CollaborativeTextEditor/utils"
 )
 
-func PositionsEqual(t *testing.T,  manager PositionManager) {
-	var position1, position2 BasicPosition
+func CheckPositionOrdering(t *testing.T, manager PositionManager, prev, mid, after Position) {
+	AssertTrue(t, manager.PositionIsLessThan(prev, mid))
+	AssertTrue(t, !manager.PositionIsLessThan(mid, prev))
 
-	// #1
-	manager.PositionManagerInit()
-	
-	NumberSetBase(10)
-	position1 = append(position1, Identifier{3, 2})
-	position1 = append(position1, Identifier{8, 2})
+	AssertTrue(t, !manager.PositionsEqual(mid, after))
+	AssertTrue(t, !manager.PositionsEqual(after, mid))
 
-	position2 = append(position2, Identifier{9, 5})
-	position2 = append(position2, Identifier{8, 1})
+	AssertTrue(t, !manager.PositionsEqual(mid, prev))
+	AssertTrue(t, !manager.PositionsEqual(prev, mid))
 
-	AssertTrue(t, !manager.PositionsEqual(position1, position2))
-	AssertTrue(t, !manager.PositionsEqual(position2, position1))
-
-	// #2
-	manager.PositionManagerInit()
-
-	NumberSetBase(64)
-	position1 = BasicPosition{}
-	position1 = append(position1, Identifier{3, 2})
-	position1 = append(position1, Identifier{8, 7})
-
-	position2 = BasicPosition{}
-	position2 = append(position2, Identifier{3, 2})
-	position2 = append(position2, Identifier{8, 7})
-
-	AssertTrue(t, manager.PositionsEqual(position1, position2))
-	AssertTrue(t, manager.PositionsEqual(position2, position1))
-
-	position2 = append(position2, Identifier{1, 2})
-	AssertTrue(t, manager.PositionIsLessThan(position1, position2))
-	AssertTrue(t, !manager.PositionsEqual(position1, position2))
-	AssertTrue(t, !manager.PositionsEqual(position2, position1))
+	AssertTrue(t, manager.PositionIsLessThan(mid, after))
+	AssertTrue(t, !manager.PositionIsLessThan(after, mid))
 }
 
-func PositionIsLessThan(t *testing.T, manager PositionManager) {
-	var position1, position2 BasicPosition
-	manager.PositionManagerInit()
+func PositionManagerTest(t *testing.T, manager PositionManager) {
+	minPosition := manager.GetMinPosition()
+	maxPosition := manager.GetMaxPosition()
+	siteId := utils.RandBetween(1, 5)
 
-	// #1
-	manager.PositionManagerInit()
+	pos1 := manager.AllocPositionBetween(minPosition, maxPosition, siteId)
+	CheckPositionOrdering(t, manager, minPosition, pos1, maxPosition)
 
-	NumberSetBase(10)
-	position1 = append(position1, Identifier{3, 2})
-	position1 = append(position1, Identifier{8, 2})
+	pos2 := manager.AllocPositionBetween(pos1, maxPosition, siteId)
+	CheckPositionOrdering(t, manager, pos1, pos2, maxPosition)
 
-	position2 = append(position2, Identifier{9, 5})
-	position2 = append(position2, Identifier{8, 1})
+	pos3 := manager.AllocPositionBetween(pos1, pos2, siteId)
+	CheckPositionOrdering(t, manager, pos1, pos3, pos2)
 
-	AssertTrue(t, manager.PositionIsLessThan(position1, position2))
-	AssertTrue(t, !manager.PositionIsLessThan(position2, position1))
-
-	// #2
-	manager.PositionManagerInit()
-
-	NumberSetBase(64)
-	position1 = BasicPosition{}
-	position1 = append(position1, Identifier{3, 2})
-	position1 = append(position1, Identifier{8, 7})
-
-	position2 = BasicPosition{}
-	position2 = append(position2, Identifier{3, 2})
-	position2 = append(position2, Identifier{8, 7})
-
-	AssertTrue(t, !manager.PositionIsLessThan(position1, position2))
-	AssertTrue(t, !manager.PositionIsLessThan(position2, position1))
-
-	position2 = append(position2, Identifier{1, 2})
-	AssertTrue(t, manager.PositionIsLessThan(position1, position2))
-	AssertTrue(t, !manager.PositionIsLessThan(position2, position1))
+	pos4 := manager.AllocPositionBetween(pos3, pos2, siteId)
+	CheckPositionOrdering(t, manager, pos3, pos4, pos2)
 }
 
-func PositionAllocation(t *testing.T, manager PositionManager) {
-	var prevPos, afterPos BasicPosition
-	manager.PositionManagerInit()
-
-	// #1
-	NumberSetBase(10)
-	prevPos = append(prevPos, Identifier{7, 2})
-
-	afterPos = append(afterPos, Identifier{10, 1})
-
-	newP := manager.AllocPositionBetween(prevPos, afterPos, 4)
-	newPosition, ok := newP.(BasicPosition)
-
-	AssertTrue(t, ok)
-	AssertTrue(t, len(newPosition) == 1)
-	AssertTrue(t, manager.PositionIsLessThan(prevPos, newPosition))
-	AssertTrue(t, newPosition[len(newPosition) - 1].site == 4)
-	AssertTrue(t, newPosition[len(newPosition) - 1].pos > 7)
-	AssertTrue(t, newPosition[len(newPosition) - 1].pos < 10)
-
-	// #2
-	manager.PositionManagerInit()
-
-	NumberSetBase(10)
-
-	prevPos = BasicPosition{}
-	afterPos = BasicPosition{}
-
-	prevPos = append(prevPos, Identifier{3, 2})
-	prevPos = append(prevPos, Identifier{9, 3})
-	prevPos = append(prevPos, Identifier{1, 2})
-
-	afterPos = append(afterPos, Identifier{3, 1})
-	afterPos = append(afterPos, Identifier{9, 5})
-	afterPos = append(afterPos, Identifier{2, 5})
-
-	newP = manager.AllocPositionBetween(prevPos, afterPos, 9)
-	newPosition, ok = newP.(BasicPosition)
-
-	AssertTrue(t, ok)
-	AssertTrue(t, len(newPosition) == 4)
-	AssertTrue(t, manager.PositionIsLessThan(prevPos, newPosition))
-	AssertTrue(t, newPosition[len(newPosition) - 1].site == 9)
-	AssertTrue(t, newPosition[len(newPosition) - 1].pos < 10)
-}
 
 func TestPosition(t *testing.T) {
 	implementations :=  []struct {
@@ -130,20 +45,15 @@ func TestPosition(t *testing.T) {
 		name string
 	} {
 		{ func() PositionManager {
-			return new(BasicPositionManager)
+			instance := NewBasicPositionManager()
+			return instance
 		}, "BasicPositonManager"},
 	}
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func (t *testing.T) {
-			t.Run("TestPositionAllocation", func (t* testing.T) {
-				PositionAllocation(t, impl.newInstance())
-			})
-			t.Run("TestPositionsEqual", func (t* testing.T) {
-				PositionsEqual(t, impl.newInstance())
-			})
-			t.Run("TestPositionIsLessThan", func (t* testing.T) {
-				PositionIsLessThan(t, impl.newInstance())
+			t.Run("TestPositionManager", func (t* testing.T) {
+				PositionManagerTest(t, impl.newInstance())
 			})
 		})
 	}

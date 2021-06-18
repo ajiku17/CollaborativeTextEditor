@@ -71,10 +71,8 @@ func TestDocDelete(t *testing.T) {
 }
 
 func TestDocInit(t *testing.T) {
-	manager := new(BasicPositionManager)
-	document := new(BasicDocument)
-
-	document.DocumentInit(manager)
+	manager := NewBasicPositionManager()
+	document := NewBasicDocument(manager)
 
 	AssertTrue(t, len(document.elems) == 2)
 	AssertTrue(t, manager.PositionsEqual(document.elems[0].position, manager.GetMinPosition()))
