@@ -12,7 +12,6 @@ func main() {
 	server := NewServer()
 	go server.HandleRequests()
 
-	// doc.InsertAt("H", 0, 1)
 	client1 := client.NewClient(1)
 	client2 := client.NewClient(2)
 	server.ConnectWithClient(client1)

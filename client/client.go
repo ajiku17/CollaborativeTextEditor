@@ -16,10 +16,7 @@ type Client struct {
 
 func NewClient(site int) *Client {
 	server_url := "http://localhost:8081/"
-	manager := new(crdt.BasicPositionManager)
-	doc := new(crdt.BasicDocument)
-	manager.PositionManagerInit()
-	doc.DocumentInit(manager)
+	doc := crdt.NewBasicDocument(crdt.NewBasicPositionManager())
 	client := Client{site, &ClientServer{server_url, &http.Client{Timeout: 5 * time.Minute}}, doc}
 	return &client
 }
