@@ -6,8 +6,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/crdt"
-	"github.com/utils"
+	"github.com/ajiku17/CollaborativeTextEditor/crdt"
+	"github.com/ajiku17/CollaborativeTextEditor/utils"
 )
 
 type ClientServer struct {
@@ -28,12 +28,12 @@ type Response struct {
 }
 
 func (client *ClientServer) SendInsertRequest(position crdt.Position, val string, site int) int {
-	jsonStr := utils.ToJson(Request{"1", site, position.ToString(), val})
+	jsonStr := utils.ToJson(Request{"1", site, crdt.BasicPositionToString(position.(crdt.BasicPosition)), val})
 	return client.sendRequest(bytes.NewBuffer(jsonStr), "Insert")
 }
 
 func (client *ClientServer) SendDeleteRequest(position crdt.Position, site int) int {
-	jsonStr := utils.ToJson(Request{"1", site, position.ToString(), ""})
+	jsonStr := utils.ToJson(Request{"1", site, crdt.BasicPositionToString(position.(crdt.BasicPosition)), ""})
 	return client.sendRequest(bytes.NewBuffer(jsonStr), "Delete")
 }
 

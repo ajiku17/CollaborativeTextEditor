@@ -1,12 +1,14 @@
 package main
 
 import (
-	"github.com/client"
+	"log"
+
+	"github.com/ajiku17/CollaborativeTextEditor/client"
 )
 
-
-
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	server := NewServer()
 	go server.HandleRequests()
 

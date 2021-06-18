@@ -5,9 +5,9 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/client"
-	"github.com/crdt"
-	"github.com/utils"
+	"github.com/ajiku17/CollaborativeTextEditor/client"
+	"github.com/ajiku17/CollaborativeTextEditor/crdt"
+	"github.com/ajiku17/CollaborativeTextEditor/utils"
 )
 
 type Server struct {
@@ -32,12 +32,10 @@ func insert(w http.ResponseWriter, r *http.Request){
 
 	
 	// Send request to all clients
-
-	var request map[string]interface{}
-	request = utils.FromJson(jsonBytes, client.Request{}).(map[string]interface{})
+	var request map[string]interface{} = utils.FromJson(jsonBytes, client.Request{}).(map[string]interface{})
 
 	site :=  int(request["site"].(float64))
-	position := crdt.ToPosition(request["position"].(string))
+	position := crdt.ToBasicPosition(request["position"].(string))
 	value := request["value"].(string)
 
 	for _, client := range server.Clients {
@@ -58,11 +56,10 @@ func delete(w http.ResponseWriter, r *http.Request){
 	
 	// Send request to all clients
 
-	var request map[string]interface{}
-	request = utils.FromJson(jsonBytes, client.Request{}).(map[string]interface{})
+	var request map[string]interface{} = utils.FromJson(jsonBytes, client.Request{}).(map[string]interface{})
 
 	site :=  int(request["site"].(float64))
-	position := crdt.ToPosition(request["position"].(string))
+	position := crdt.ToBasicPosition(request["position"].(string))
 
 	for _, client := range server.Clients {
 		if client.GetSite() != site {

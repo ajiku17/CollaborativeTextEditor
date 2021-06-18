@@ -5,18 +5,22 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/crdt"
+	"github.com/ajiku17/CollaborativeTextEditor/crdt"
 )
 
 type Client struct {
 	site int
 	clientServer *ClientServer
-	document     *crdt.Document
+	document     crdt.Document
 }
 
 func NewClient(site int) *Client {
 	server_url := "http://localhost:8081/"
-	client := Client{site, &ClientServer{server_url, &http.Client{Timeout: 5 * time.Minute}}, crdt.NewDocument()}
+	manager := new(crdt.BasicPositionManager)
+	doc := new(crdt.BasicDocument)
+	manager.PositionManagerInit()
+	doc.DocumentInit(manager)
+	client := Client{site, &ClientServer{server_url, &http.Client{Timeout: 5 * time.Minute}}, doc}
 	return &client
 }
 
@@ -25,22 +29,22 @@ func (client *Client) GetSite() int {
 }
 
 func (client *Client) Insert(val string, index int) {
-	position := client.document.InsertAt(val, index, client.site)
+	position := client.document.InsertAtIndex(val, index, client.site)
 	client.clientServer.SendInsertRequest(position, val, client.site)
 }
 
 func (client *Client) InsertAtPosition(pos crdt.Position, val string) {
-	client.document.InsertAtPos(pos, val)
+	client.document.InsertAtPosition(pos, val)
 	// TODO: send server an acknowledgement request
 }
 
 func (client *Client) Delete(index int) {
-	position := client.document.DeleteAt(index)
+	position := client.document.DeleteAtIndex(index)
 	client.clientServer.SendDeleteRequest(position, client.site)
 }
 
 func (client *Client) DeleteAtPosition(pos crdt.Position) {
-	client.document.DeleteAtPos(pos)
+	client.document.DeleteAtPosition(pos)
 	// TODO: send server an acknowledgement request
 }
 
