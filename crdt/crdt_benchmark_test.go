@@ -7,11 +7,10 @@ import (
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
 )
 
-func DocumentInsertAtTop(b *testing.B, document Document, manager PositionManager) {
+func DocumentInsertAtTop(b *testing.B, newDocumentInstance func () Document) {
 	text := "Hello again!"
 	for n := 0; n < b.N; n++ {	
-		manager.PositionManagerInit()
-		document.DocumentInit(manager)
+		document := newDocumentInstance()
 		InsertAtTop(document, utils.Reverse(text))
 		if document.ToString() != text {
 			b.Helper()
@@ -20,12 +19,11 @@ func DocumentInsertAtTop(b *testing.B, document Document, manager PositionManage
 	}
 }
 
-func DocumentInsertAtBottom(b *testing.B, document Document, manager PositionManager) {
+func DocumentInsertAtBottom(b *testing.B, newDocumentInstance func () Document) {
 	text := "Hi everyone!"
 
 	for n := 0; n < b.N; n++ {
-		manager.PositionManagerInit()
-		document.DocumentInit(manager)
+		document := newDocumentInstance()
 		InsertAtBottom(document, text)
 		if document.ToString() != text {
 			b.Helper()
@@ -39,26 +37,23 @@ func BenchmarkDocument(b *testing.B) {
 
 	implementations :=  []struct {
 		newDocumentInstance func () Document
-		newPositionManagerInstance func () PositionManager
 		name string
 	} {
 		{ 
 			func() Document {
-				return new(BasicDocument)
-			}, 
-			func() PositionManager {
-				return new(BasicPositionManager)
-			}, 
-			"BasicDocument"},
+				return NewBasicDocument(NewBasicPositionManager())
+			},
+			"BasicDocument",
+		},
 	}
 
 	for _, impl := range implementations {
 		b.Run(impl.name, func (b *testing.B) {
 			b.Run("BenchmarkInsertAtBottom", func (b* testing.B) {
-				DocumentInsertAtBottom(b, impl.newDocumentInstance(), impl.newPositionManagerInstance())
+				DocumentInsertAtBottom(b, impl.newDocumentInstance)
 			})
 			b.Run("BenchmarkDocumentInsertAtTop", func (b* testing.B) {
-				DocumentInsertAtTop(b, impl.newDocumentInstance(), impl.newPositionManagerInstance())
+				DocumentInsertAtTop(b, impl.newDocumentInstance)
 			})
 		})
 	}

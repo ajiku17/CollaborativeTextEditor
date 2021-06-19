@@ -19,12 +19,15 @@ func (doc *BasicDocument) Length() int {
 	return len(doc.elems) - 2
 }
 
-func (doc *BasicDocument) DocumentInit(positionManager PositionManager) {
+func NewBasicDocument(positionManager PositionManager) *BasicDocument {
+	doc := new(BasicDocument)
 	doc.elems = []Element{}
 	doc.positionManager = positionManager
 
 	doc.docInsert(0, Element{"", doc.positionManager.GetMaxPosition()})
 	doc.docInsert(0, Element{"", doc.positionManager.GetMinPosition()})
+
+	return doc
 }
 
 

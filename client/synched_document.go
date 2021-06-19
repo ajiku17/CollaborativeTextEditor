@@ -17,10 +17,7 @@ type SynchedDocument struct {
 
 func NewSynchedDoc(site int) *SynchedDocument {
 	serverUrl := "http://localhost:8081/"
-	manager := new(crdt.BasicPositionManager)
-	doc := new(crdt.BasicDocument)
-	manager.PositionManagerInit()
-	doc.DocumentInit(manager)
+	doc := crdt.NewBasicDocument(crdt.NewBasicPositionManager())
 	synchedDoc := SynchedDocument{site, &RemoteDocument{serverUrl, &http.Client{Timeout: 5 * time.Minute}}, doc}
 	return &synchedDoc
 }
