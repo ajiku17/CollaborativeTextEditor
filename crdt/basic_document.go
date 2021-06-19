@@ -1,6 +1,9 @@
 package crdt
 
-import "log"
+import (
+	"log"
+)
+
 
 type Element struct {
 	data     string

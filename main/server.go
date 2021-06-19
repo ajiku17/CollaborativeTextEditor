@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/ajiku17/CollaborativeTextEditor/client"
 	"github.com/ajiku17/CollaborativeTextEditor/crdt"
@@ -11,7 +12,7 @@ import (
 )
 
 type Server struct {
-	Clients []*(client.Client)
+	SynchedDocuments []*(client.SynchedDocument)
 }
 
 var server *Server
@@ -34,11 +35,11 @@ func insert(w http.ResponseWriter, r *http.Request){
 	// Send request to all clients
 	var request map[string]interface{} = utils.FromJson(jsonBytes, client.Request{}).(map[string]interface{})
 
-	site :=  int(request["site"].(float64))
+	site, err :=  strconv.Atoi(request["site"].(string))
 	position := crdt.ToBasicPosition(request["position"].(string))
 	value := request["value"].(string)
 
-	for _, client := range server.Clients {
+	for _, client := range server.SynchedDocuments {
 		if client.GetSite() != site {
 			client.InsertAtPosition(position, value)
 		}
@@ -58,10 +59,10 @@ func delete(w http.ResponseWriter, r *http.Request){
 
 	var request map[string]interface{} = utils.FromJson(jsonBytes, client.Request{}).(map[string]interface{})
 
-	site :=  int(request["site"].(float64))
+	site :=  request["site"]
 	position := crdt.ToBasicPosition(request["position"].(string))
 
-	for _, client := range server.Clients {
+	for _, client := range server.SynchedDocuments {
 		if client.GetSite() != site {
 			client.DeleteAtPosition(position)
 		}
@@ -74,6 +75,6 @@ func (server *Server)HandleRequests() {
     log.Fatal(http.ListenAndServe(":8081", nil))
 }
 
-func (server *Server)ConnectWithClient(client *client.Client) {
-	server.Clients = append(server.Clients, client)
+func (server *Server)ConnectWithClient(doc *client.SynchedDocument) {
+	server.SynchedDocuments = append(server.SynchedDocuments, doc)
 }
