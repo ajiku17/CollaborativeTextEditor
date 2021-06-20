@@ -6,7 +6,7 @@ import (
 
 type SyncedDocument struct {
 	site int
-	updateManager *DocumentUpdateManager
+	updateManager DocumentUpdateManager
 	Document     Document
 }
 
