@@ -1,25 +1,26 @@
-package crdt
+package test
 
 import (
+	"github.com/ajiku17/CollaborativeTextEditor/crdt"
 	"log"
 	"testing"
 
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
 )
 
-func InsertAtTop(doc Document, text string) {
+func InsertAtTop(doc crdt.Document, text string) {
 	for _, character := range text {
 		doc.InsertAtIndex(string(character), 0, utils.RandBetween(1, 5))
 	}
 }
 
-func InsertAtBottom(doc Document, text string) {
+func InsertAtBottom(doc crdt.Document, text string) {
 	for index, character := range text {
 		doc.InsertAtIndex(string(character), index, utils.RandBetween(1, 5))
 	}
 }
 
-func DocumentInsertAtIndex(t *testing.T, newDocumentInstance func () Document) {
+func DocumentInsertAtIndex(t *testing.T, newDocumentInstance func () crdt.Document) {
 	
 	// #1
 	document := newDocumentInstance()
@@ -48,7 +49,7 @@ func DocumentInsertAtIndex(t *testing.T, newDocumentInstance func () Document) {
 	AssertTrue(t, document.ToString() == text)
 }
 
-func DocumentDeleteAtIndex(t *testing.T, newDocumentInstance func () Document) {
+func DocumentDeleteAtIndex(t *testing.T, newDocumentInstance func () crdt.Document) {
 
 	// #1
 	document := newDocumentInstance()
@@ -109,7 +110,7 @@ func DocumentDeleteAtIndex(t *testing.T, newDocumentInstance func () Document) {
 	AssertTrue(t, document.ToString() == "Hi folks!")
 }
 
-func DocInsertAtPosition(t *testing.T, newDocumentInstance func () Document, newManagerInstance func () PositionManager) {
+func DocInsertAtPosition(t *testing.T, newDocumentInstance func () crdt.Document, newManagerInstance func () crdt.PositionManager) {
 	// #1
 	document := newDocumentInstance()
 	manager := newManagerInstance()
@@ -118,14 +119,14 @@ func DocInsertAtPosition(t *testing.T, newDocumentInstance func () Document, new
 	prev := manager.GetMinPosition()
 	next := manager.GetMaxPosition()
 	positions := []struct {
-		pos Position
+		pos crdt.Position
 		val string
 	}{}
 
 	for _, c := range text {
 		pos := manager.AllocPositionBetween(prev, next, utils.RandBetween(1, 5))
 		positions = append(positions, struct {
-			pos Position
+			pos crdt.Position
 			val string
 		}{pos, string(c)})
 		prev = pos
@@ -158,7 +159,7 @@ func DocInsertAtPosition(t *testing.T, newDocumentInstance func () Document, new
 	AssertTrue(t, document.ToString() == "Hi everyone!")
 }
 
-func DocDeleteAtPos(t *testing.T, newDocumentInstance func () Document, newManagerInstance func () PositionManager) {
+func DocDeleteAtPos(t *testing.T, newDocumentInstance func () crdt.Document, newManagerInstance func () crdt.PositionManager) {
 	document := newDocumentInstance()
 	manager := newManagerInstance()
 
@@ -167,14 +168,14 @@ func DocDeleteAtPos(t *testing.T, newDocumentInstance func () Document, newManag
 	prev := manager.GetMinPosition()
 	next := manager.GetMaxPosition()
 	positions := []struct {
-		pos Position
+		pos crdt.Position
 		val string
 	}{}
 
 	for _, c := range text {
 		pos := manager.AllocPositionBetween(prev, next, utils.RandBetween(1, 5))
 		positions = append(positions, struct {
-			pos Position
+			pos crdt.Position
 			val string
 		}{pos, string(c)})
 		prev = pos
@@ -207,16 +208,16 @@ func TestDocument(t *testing.T) {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	implementations :=  []struct {
-		newDocumentInstance func () Document
-		newPositionManagerInstance func () PositionManager
+		newDocumentInstance func () crdt.Document
+		newPositionManagerInstance func () crdt.PositionManager
 		name string
 	} {
 		{ 
-			func() Document {
-				return NewBasicDocument(NewBasicPositionManager())
+			func() crdt.Document {
+				return crdt.NewBasicDocument(crdt.NewBasicPositionManager())
 			},
-			func() PositionManager {
-				return NewBasicPositionManager()
+			func() crdt.PositionManager {
+				return crdt.NewBasicPositionManager()
 			},
 			"BasicDocument",
 		},

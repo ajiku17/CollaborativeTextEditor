@@ -1,4 +1,4 @@
-package crdt
+package test
 
 import (
 	"testing"

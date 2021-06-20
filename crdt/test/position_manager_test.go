@@ -1,12 +1,13 @@
-package crdt
+package test
 
 import (
+	"github.com/ajiku17/CollaborativeTextEditor/crdt"
 	"testing"
 
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
 )
 
-func CheckPositionOrdering(t *testing.T, manager PositionManager, prev, mid, after Position) {
+func CheckPositionOrdering(t *testing.T, manager crdt.PositionManager, prev, mid, after crdt.Position) {
 	AssertTrue(t, manager.PositionIsLessThan(prev, mid))
 	AssertTrue(t, !manager.PositionIsLessThan(mid, prev))
 
@@ -20,7 +21,7 @@ func CheckPositionOrdering(t *testing.T, manager PositionManager, prev, mid, aft
 	AssertTrue(t, !manager.PositionIsLessThan(after, mid))
 }
 
-func PositionManagerTest(t *testing.T, manager PositionManager) {
+func PositionManagerTest(t *testing.T, manager crdt.PositionManager) {
 	minPosition := manager.GetMinPosition()
 	maxPosition := manager.GetMaxPosition()
 	siteId := utils.RandBetween(1, 5)
@@ -41,11 +42,11 @@ func PositionManagerTest(t *testing.T, manager PositionManager) {
 
 func TestPosition(t *testing.T) {
 	implementations :=  []struct {
-		newInstance func () PositionManager
+		newInstance func () crdt.PositionManager
 		name string
 	} {
-		{ func() PositionManager {
-			instance := NewBasicPositionManager()
+		{ func() crdt.PositionManager {
+			instance := crdt.NewBasicPositionManager()
 			return instance
 		}, "BasicPositonManager"},
 	}
