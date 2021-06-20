@@ -1,9 +1,7 @@
 package main
 
 import (
-	"fmt"
 	"net"
-	"strconv"
 	"time"
 
 	"github.com/ajiku17/CollaborativeTextEditor/crdt"
@@ -12,6 +10,7 @@ import (
 
 type Server struct {
 	SyncedDocuments []*(crdt.SyncedDocument)
+	connectedSockets map[net.Conn]string
 }
 
 var server *Server
@@ -20,6 +19,7 @@ func NewServer() *Server {
 	if server == nil {
 		server = &Server{}
 	}
+	server.connectedSockets = make(map[net.Conn]string)
 	go server.Listen()
 	return server
 }
@@ -39,18 +39,25 @@ func (server *Server)Listen() {
 				return
 		}
 		socket.SetDeadline(time.Now().Add(time.Second))
+		server.connectedSockets[socket] = ""
 		go server.HandleRequest(socket)
 	}
 }
 
 func insert(data utils.PackedDocument){
 	// Send request to all clients
-	position := crdt.ToBasicPosition(data.Position)
-	value := data.Value
+	// position := crdt.ToBasicPosition(data.Position)
+	// value := data.Value
 
-	for _, syncedDoc := range server.SyncedDocuments {
-		if strconv.Itoa(syncedDoc.GetSite()) != data.Site {
-			syncedDoc.InsertAtPosition(position, value)
+	// for _, syncedDoc := range server.SyncedDocuments {
+	// 	if strconv.Itoa(syncedDoc.GetSite()) != data.Site {
+	// 		fmt.Printf("Forward to %d\n", syncedDoc.GetSite())
+	// 		syncedDoc.InsertAtPosition(position, value)
+	// 	}
+	// }
+	for socket, site := range server.connectedSockets {
+		if site != data.Site {
+			socket.Write(utils.ToBytes(data))
 		}
 	}
 }
@@ -58,11 +65,16 @@ func insert(data utils.PackedDocument){
 
 func delete(data utils.PackedDocument){
 	// Send request to all clients
-	position := crdt.ToBasicPosition(data.Position)
+	// position := crdt.ToBasicPosition(data.Position)
 
-	for _, syncedDoc := range server.SyncedDocuments {
-		if strconv.Itoa(syncedDoc.GetSite()) != data.Site {
-			syncedDoc.DeleteAtPosition(position)
+	// for _, syncedDoc := range server.SyncedDocuments {
+	// 	if strconv.Itoa(syncedDoc.GetSite()) != data.Site {
+	// 		syncedDoc.DeleteAtPosition(position)
+	// 	}
+	// }
+	for socket, site := range server.connectedSockets {
+		if site != data.Site {
+			socket.Write(utils.ToBytes(data))
 		}
 	}
 }
@@ -76,7 +88,6 @@ func (server *Server) HandleRequest(socket net.Conn) {
 		receivedMessage := make([]byte, 1024)
 		_, err := socket.Read(receivedMessage)
 		if err != nil {
-				fmt.Println(err)
 				socket.SetDeadline(time.Now().Add(time.Second))
 				continue
 		}
@@ -85,7 +96,12 @@ func (server *Server) HandleRequest(socket net.Conn) {
 				continue
 		}
 
+		// fmt.Printf("Server received %s\n", receivedMessage)
+
 		var packedDocument = utils.FromBytes(receivedMessage)
+
+		server.setSocketSite(packedDocument.Site, socket)
+		
 		action := packedDocument.Action
 
 		if action == "Insert" {
@@ -94,8 +110,14 @@ func (server *Server) HandleRequest(socket net.Conn) {
 			delete(packedDocument)
 		}
 		
-		sendMessage := "OK"
-		socket.Write([]byte(sendMessage))
+
+		//?
+		// sendMessage := "OK"
+		// socket.Write([]byte(sendMessage))
 		
 	}
+}
+
+func (server *Server) setSocketSite(site string, socket net.Conn) {
+	server.connectedSockets[socket] = site
 }

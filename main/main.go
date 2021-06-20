@@ -1,14 +1,12 @@
 package main
 
 import (
-	"log"
+	"time"
 
 	"github.com/ajiku17/CollaborativeTextEditor/crdt"
 )
 
 func main() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-
 	server := NewServer()
 
 	doc1 := crdt.NewSynchedDoc(1)
@@ -17,18 +15,19 @@ func main() {
 	server.ConnectWithClient(doc2)
 	
 	doc1.InsertAtIndex("H", 0, 1)
-	doc2.InsertAtIndex("e", 1, 2)
-	doc1.InsertAtIndex("l", 2, 1)
-	doc1.InsertAtIndex("l", 3, 1)
-	doc2.InsertAtIndex("o", 4, 2)
-	doc2.InsertAtIndex(" ", 5, 2)
-	doc2.InsertAtIndex("W", 6, 2)
-	doc1.InsertAtIndex("o", 7, 1)
-	doc1.InsertAtIndex("r", 8, 1)
-	doc1.InsertAtIndex("l", 9, 1)
-	doc1.DeleteAtIndex(9)
-	doc2.InsertAtIndex("d", 9, 2)
+	// doc2.InsertAtIndex("e", doc2.GetLastIndex(), 2)
+	// doc1.InsertAtIndex("l", doc1.GetLastIndex(), 1)
+	// doc1.InsertAtIndex("l", doc1.GetLastIndex(), 1)
+	// doc2.InsertAtIndex("o", doc2.GetLastIndex(), 2)
+	// doc2.InsertAtIndex(" ", doc2.GetLastIndex(), 2)
+	// doc2.InsertAtIndex("W", doc2.GetLastIndex(), 2)
+	// doc1.InsertAtIndex("o", doc1.GetLastIndex(), 1)
+	// doc1.InsertAtIndex("r", doc1.GetLastIndex(), 1)
+	// doc1.InsertAtIndex("l", doc1.GetLastIndex(), 1)
+	// doc1.DeleteAtIndex(doc1.GetLastIndex())
+	// doc2.InsertAtIndex("d", doc2.GetLastIndex(), 2)
 
+	time.Sleep(10 * time.Second)
 	doc1.PrintDocument()
 	doc2.PrintDocument()
 }

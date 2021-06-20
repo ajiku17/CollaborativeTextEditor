@@ -2,7 +2,6 @@ package utils
 
 import (
 	"bytes"
-	"strconv"
 )
 
 type PackedDocument struct {
@@ -12,8 +11,8 @@ type PackedDocument struct {
 	Action string
 }
 
-func ToBytes(site int, position string, val string, action string) []byte {
-	fullData := strconv.Itoa(site) + "\n" + position + "\n" + val + "\n" + action + "\n"
+func ToBytes(packedDocument PackedDocument) []byte {
+	fullData := packedDocument.Site + "\n" + packedDocument.Position + "\n" + packedDocument.Value + "\n" + packedDocument.Action + "\n"
 	return []byte(fullData)
 }
 
