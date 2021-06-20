@@ -2,12 +2,9 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
-	"net/http"
 	"strconv"
-	"strings"
-	"sync"
+	"time"
 
 	"github.com/ajiku17/CollaborativeTextEditor/crdt"
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
@@ -23,97 +20,82 @@ func NewServer() *Server {
 	if server == nil {
 		server = &Server{}
 	}
+	go server.Listen()
 	return server
 }
 
-func insert(w http.ResponseWriter, r *http.Request){
-	jsonBytes, err := ioutil.ReadAll(r.Body)
+func (server *Server)Listen() {
+	listener, err := net.Listen("tcp", "localhost:8081")
 	if err != nil {
-		panic(err)
+			// fmt.Println(err)
+			return
 	}
-	print("%s\n", string(jsonBytes))
+	defer listener.Close()
 
-	
+	for {
+		socket, err := listener.Accept()
+		if err != nil {
+				// fmt.Println(err)
+				return
+		}
+		socket.SetDeadline(time.Now().Add(time.Second))
+		go server.HandleRequest(socket)
+	}
+}
+
+func insert(data utils.PackedDocument){
 	// Send request to all clients
-	var request map[string]interface{} = utils.FromJson(jsonBytes, crdt.Request{}).(map[string]interface{})
+	position := crdt.ToBasicPosition(data.Position)
+	value := data.Value
 
-	site, err :=  strconv.Atoi(request["site"].(string))
-	position := crdt.ToBasicPosition(request["position"].(string))
-	value := request["value"].(string)
-
-	for _, client := range server.SyncedDocuments {
-		if client.GetSite() != site {
-			client.InsertAtPosition(position, value)
+	for _, syncedDoc := range server.SyncedDocuments {
+		if strconv.Itoa(syncedDoc.GetSite()) != data.Site {
+			syncedDoc.InsertAtPosition(position, value)
 		}
 	}
 }
 
 
-func delete(w http.ResponseWriter, r *http.Request){
-	jsonBytes, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		panic(err)
-	}
-	print("%s\n", string(jsonBytes))
-
-	
+func delete(data utils.PackedDocument){
 	// Send request to all clients
+	position := crdt.ToBasicPosition(data.Position)
 
-	var request map[string]interface{} = utils.FromJson(jsonBytes, crdt.Request{}).(map[string]interface{})
-
-	site :=  request["site"]
-	position := crdt.ToBasicPosition(request["position"].(string))
-
-	for _, client := range server.SyncedDocuments {
-		if client.GetSite() != site {
-			client.DeleteAtPosition(position)
+	for _, syncedDoc := range server.SyncedDocuments {
+		if strconv.Itoa(syncedDoc.GetSite()) != data.Site {
+			syncedDoc.DeleteAtPosition(position)
 		}
 	}
 }
-
-// func (server *Server)HandleRequests() {
-//     http.HandleFunc("/Insert", insert)
-//     http.HandleFunc("/Delete", delete)
-//     log.Fatal(http.ListenAndServe(":8081", nil))
-// }
 
 func (server *Server)ConnectWithClient(doc *crdt.SyncedDocument) {
 	server.SyncedDocuments = append(server.SyncedDocuments, doc)
 }
 
-func (server *Server) HandleRequests(mu *sync.Mutex) {
-	listener, err := net.Listen("tcp", "localhost:8081")
-	if err != nil {
-			fmt.Println(err)
-			mu.Unlock()
-			return
-	}
-	mu.Unlock()
-
-	defer listener.Close()
-
-	socket, err := listener.Accept()
-	if err != nil {
-			fmt.Println(err)
-			return
-	}
-
-	// fmt.Printf("%s\n", socket)
+func (server *Server) HandleRequest(socket net.Conn) {
 	for {
-			var receivedMessage []byte
-			socket.Read(receivedMessage)
+		receivedMessage := make([]byte, 1024)
+		_, err := socket.Read(receivedMessage)
+		if err != nil {
+				fmt.Println(err)
+				socket.SetDeadline(time.Now().Add(time.Second))
+				continue
+		}
+		
+		if string(receivedMessage) == "Done"{
+				continue
+		}
 
-			if err != nil {
-					fmt.Println(err)
-					return
-			}
-			fmt.Printf("RECEIVED - %b\n", receivedMessage)
-			if strings.TrimSpace(string(receivedMessage)) == "" {
-					fmt.Println("Exiting TCP server!")
-					return
-			}
-			
-			sendMessage := "Hi"
-			socket.Write([]byte(sendMessage))
+		var packedDocument = utils.FromBytes(receivedMessage)
+		action := packedDocument.Action
+
+		if action == "Insert" {
+			insert(packedDocument)
+		} else {
+			delete(packedDocument)
+		}
+		
+		sendMessage := "OK"
+		socket.Write([]byte(sendMessage))
+		
 	}
 }
