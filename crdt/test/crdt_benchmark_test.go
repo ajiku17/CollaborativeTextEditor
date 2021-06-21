@@ -1,13 +1,14 @@
-package crdt
+package test
 
 import (
+	"github.com/ajiku17/CollaborativeTextEditor/crdt"
 	"log"
 	"testing"
 
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
 )
 
-func DocumentInsertAtTop(b *testing.B, newDocumentInstance func () Document) {
+func DocumentInsertAtTop(b *testing.B, newDocumentInstance func () crdt.Document) {
 	text := "Hello again!"
 	for n := 0; n < b.N; n++ {	
 		document := newDocumentInstance()
@@ -19,7 +20,7 @@ func DocumentInsertAtTop(b *testing.B, newDocumentInstance func () Document) {
 	}
 }
 
-func DocumentInsertAtBottom(b *testing.B, newDocumentInstance func () Document) {
+func DocumentInsertAtBottom(b *testing.B, newDocumentInstance func () crdt.Document) {
 	text := "Hi everyone!"
 
 	for n := 0; n < b.N; n++ {
@@ -36,12 +37,12 @@ func BenchmarkDocument(b *testing.B) {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	implementations :=  []struct {
-		newDocumentInstance func () Document
+		newDocumentInstance func () crdt.Document
 		name string
 	} {
 		{ 
-			func() Document {
-				return NewBasicDocument(NewBasicPositionManager())
+			func() crdt.Document {
+				return crdt.NewBasicDocument(crdt.NewBasicPositionManager())
 			},
 			"BasicDocument",
 		},

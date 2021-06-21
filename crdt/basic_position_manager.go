@@ -13,26 +13,26 @@ import (
 const base = math.MaxInt32
 
 type Identifier struct {
-	pos  int
-	site int
+	Pos  int
+	Site int
 }
 
 type BasicPositionManager struct {
-	base int
+	Base int
 }
 
 type BasicPosition []Identifier
 
 func NewBasicPositionManager() *BasicPositionManager{
 	manager := new(BasicPositionManager)
-	manager.base = base
-	NumberSetBase(manager.base)
+	manager.Base = base
+	NumberSetBase(manager.Base)
 
 	return manager
 }
 
 func (manager *BasicPositionManager) GetMaxPosition() Position {
-	return BasicPosition{Identifier{manager.base, 0}}
+	return BasicPosition{Identifier{manager.Base, 0}}
 }
 
 func (manager *BasicPositionManager) GetMinPosition() Position {
@@ -42,21 +42,21 @@ func (manager *BasicPositionManager) GetMinPosition() Position {
 func PositionToNumber(pos BasicPosition) Number {
 	num := make(Number, len(pos))
 	for i := 0; i < len(pos); i++ {
-		num[i] = pos[i].pos
+		num[i] = pos[i].Pos
 	}
 	return num
 }
 
 func IdentifierEquals(id1, id2 Identifier) bool {
-	return id1.pos == id2.pos && id1.site == id2.site
+	return id1.Pos == id2.Pos && id1.Site == id2.Site
 }
 
 func IdentifierIsGreaterOrEqual(id1, id2 Identifier) bool {
-	if id1.pos == id2.pos {
-		return id1.site >= id2.site
+	if id1.Pos == id2.Pos {
+		return id1.Site >= id2.Site
 	}
 
-	return id1.pos >= id2.pos
+	return id1.Pos >= id2.Pos
 }
 
 func IdentifierIsLessThan(id1, id2 Identifier) bool {
@@ -68,7 +68,7 @@ func (manager *BasicPositionManager) PositionsEqual(pos1, pos2 Position) bool {
 	basicPos2, ok2 := pos2.(BasicPosition)
 	if ok1 && ok2 {
 
-		if (len(basicPos1) != len(basicPos2)) {
+		if len(basicPos1) != len(basicPos2) {
 			return false
 		}
 
@@ -83,10 +83,10 @@ func (manager *BasicPositionManager) PositionsEqual(pos1, pos2 Position) bool {
 		log.Fatalf("BasicPositionManager: Invalid position types %T and %T", pos1, pos2)
 	}
 
-	return false;
+	return false
 }
 
-func (mamanger *BasicPositionManager)PositionIsGreaterOrEqual(pos1, pos2 Position) bool {
+func (manager *BasicPositionManager)PositionIsGreaterOrEqual(pos1, pos2 Position) bool {
 	basicPos1, ok1 := pos1.(BasicPosition)
 	basicPos2, ok2 := pos2.(BasicPosition)
 	if ok1 && ok2 {
@@ -115,7 +115,7 @@ func (mamanger *BasicPositionManager)PositionIsGreaterOrEqual(pos1, pos2 Positio
 		log.Fatalf("BasicPositionManager: Invalid position types %T and %T", pos1, pos2)
 	}
 
-	return false;
+	return false
 }
 
 func (manager *BasicPositionManager)PositionIsLessThan(pos1, pos2 Position) bool {
@@ -138,15 +138,15 @@ func PositionAdd(pos1, pos2 BasicPosition) Number {
 
 func PositionAddInt(pos BasicPosition, val int) BasicPosition {
 	identifier := pos[len(pos)-1]
-	return append(pos, Identifier{identifier.pos + val, identifier.site})
+	return append(pos, Identifier{identifier.Pos + val, identifier.Site})
 }
 
-func prefix(position BasicPosition, index int) Number {
+func Prefix(position BasicPosition, index int) Number {
 	var numberCopy Number
 
 	for i := 0; i < index; i++ {
 		if i < len(position) {
-			numberCopy = append(numberCopy, position[i].pos)
+			numberCopy = append(numberCopy, position[i].Pos)
 		} else {
 			numberCopy = append(numberCopy, 0)
 		}
@@ -154,18 +154,18 @@ func prefix(position BasicPosition, index int) Number {
 	return numberCopy
 }
 
-func constructPosition(r Number, prevPos, afterPos BasicPosition, site int) BasicPosition {
-	var res BasicPosition;
+func ConstructPosition(r Number, prevPos, afterPos BasicPosition, site int) BasicPosition {
+	var res BasicPosition
 
 	for i, digit := range r {
 		var s int
 		
 		if i == len(r) - 1 {
 			s = site
-		} else if i < len(prevPos) && digit == prevPos[i].pos {
-			s = prevPos[i].site
-		} else if i < len(afterPos) && digit == afterPos[i].pos{
-			s = afterPos[i].site
+		} else if i < len(prevPos) && digit == prevPos[i].Pos {
+			s = prevPos[i].Site
+		} else if i < len(afterPos) && digit == afterPos[i].Pos{
+			s = afterPos[i].Site
 		} else {
 			s = site
 		}
@@ -184,12 +184,12 @@ func (manager *BasicPositionManager) AllocPositionBetween(prevPos, afterPos Posi
 		interval := 0
 		for interval < 1 {
 			index++
-			interval = NumberToInt(NumberSubtract(prefix(afterBasicPos, index), prefix(prevBasicPos, index))) - 1
+			interval = NumberToInt(NumberSubtract(Prefix(afterBasicPos, index), Prefix(prevBasicPos, index))) - 1
 		}
 		step := utils.Min(BASE, interval)
 
-		r := prefix(prevBasicPos, index)
-		position := constructPosition(NumberAdd(r, Number{utils.RandBetween(0, step) + 1}), prevBasicPos, afterBasicPos, site)
+		r := Prefix(prevBasicPos, index)
+		position := ConstructPosition(NumberAdd(r, Number{utils.RandBetween(0, step) + 1}), prevBasicPos, afterBasicPos, site)
 
 		return position
 	} else {
