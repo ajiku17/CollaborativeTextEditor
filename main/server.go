@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net"
 	"time"
 
@@ -44,36 +45,11 @@ func (server *Server)Listen() {
 	}
 }
 
-func insert(data utils.PackedDocument){
+func sendAll(data utils.PackedDocument){
 	// Send request to all clients
-	// position := crdt.ToBasicPosition(data.Position)
-	// value := data.Value
-
-	// for _, syncedDoc := range server.SyncedDocuments {
-	// 	if strconv.Itoa(syncedDoc.GetSite()) != data.Site {
-	// 		fmt.Printf("Forward to %d\n", syncedDoc.GetSite())
-	// 		syncedDoc.InsertAtPosition(position, value)
-	// 	}
-	// }
 	for socket, site := range server.connectedSockets {
 		if site != data.Site {
-			socket.Write(utils.ToBytes(data))
-		}
-	}
-}
-
-
-func delete(data utils.PackedDocument){
-	// Send request to all clients
-	// position := crdt.ToBasicPosition(data.Position)
-
-	// for _, syncedDoc := range server.SyncedDocuments {
-	// 	if strconv.Itoa(syncedDoc.GetSite()) != data.Site {
-	// 		syncedDoc.DeleteAtPosition(position)
-	// 	}
-	// }
-	for socket, site := range server.connectedSockets {
-		if site != data.Site {
+			fmt.Printf("Server Send %s\n", utils.ToBytes(data))
 			socket.Write(utils.ToBytes(data))
 		}
 	}
@@ -96,24 +72,13 @@ func (server *Server) HandleRequest(socket net.Conn) {
 				continue
 		}
 
-		// fmt.Printf("Server received %s\n", receivedMessage)
+		fmt.Printf("Server received %s\n", receivedMessage)
 
 		var packedDocument = utils.FromBytes(receivedMessage)
 
 		server.setSocketSite(packedDocument.Site, socket)
 		
-		action := packedDocument.Action
-
-		if action == "Insert" {
-			insert(packedDocument)
-		} else {
-			delete(packedDocument)
-		}
-		
-
-		//?
-		// sendMessage := "OK"
-		// socket.Write([]byte(sendMessage))
+		sendAll(packedDocument)
 		
 	}
 }

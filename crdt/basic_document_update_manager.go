@@ -1,6 +1,7 @@
 package crdt
 
 import (
+	"fmt"
 	"net"
 	"strconv"
 	"time"
@@ -8,10 +9,17 @@ import (
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
 )
 
+type Action int
+
+const (
+    Insert Action = 0
+    Delete Action = 1
+)
+
 type BasicDocumentUpdateManager struct {
 	url    string
 	socket net.Conn
-	toNotify *utils.PackedDocument
+	toNotify chan *utils.PackedDocument
 }
 
 func NewDocumentUpdateManager(serverUrl string) *BasicDocumentUpdateManager {
@@ -22,7 +30,8 @@ func NewDocumentUpdateManager(serverUrl string) *BasicDocumentUpdateManager {
 			continue
 		}
 		socket.SetDeadline(time.Now().Add(time.Second))
-		manager := BasicDocumentUpdateManager{serverUrl, socket, nil}
+		toNotify := make(chan(*utils.PackedDocument))
+		manager := BasicDocumentUpdateManager{serverUrl, socket, toNotify}
 		go manager.AddListener()
 		return &manager
 	}
@@ -43,7 +52,7 @@ func (manager *BasicDocumentUpdateManager)sendRequest(data []byte, actionName st
 	socket := manager.socket
 	for {
 		_, err := socket.Write(data)
-		// fmt.Printf("Client send %s", data)
+		fmt.Printf("Client send %s\n", data)
 		if err != nil {
 			socket.SetDeadline(time.Now().Add(time.Second))
 			continue
@@ -51,17 +60,6 @@ func (manager *BasicDocumentUpdateManager)sendRequest(data []byte, actionName st
 			// fmt.Printf("TCP Exit")
 			return
 		}
-
-		// received := make([]byte, 1024)
-		// _, err = socket.Read(received)
-		// if err != nil {
-		// 	socket.SetDeadline(time.Now().Add(time.Second))
-		// 	continue
-		// }
-		// received = received[:bytes.Index(received, []byte{0})]   //remove trailing zeros
-		// if bytes.Compare(received, []byte("OK")) == 0{
-		// 		return
-		// }
 	}
 }
 
@@ -74,13 +72,13 @@ func (manager *BasicDocumentUpdateManager)AddListener() {
 			socket.SetDeadline(time.Now().Add(time.Second))
 			continue
 		}
-		// fmt.Printf("RECEIVED - %s\n", received)
+		fmt.Printf("Listener Received %s\n", received)
 		var packedDocument = utils.FromBytes(received)
-		manager.toNotify = &packedDocument
+		manager.toNotify <- &packedDocument
 	}
 }
 
 
 func (manager *BasicDocumentUpdateManager)Notify() *utils.PackedDocument {
-	return manager.toNotify
+	return <- manager.toNotify
 }
