@@ -221,7 +221,7 @@ func ToBasicPosition(position string) Position  {
 func BasicPositionToString(pos BasicPosition) string {
 	res := ""
 	for _, identifier := range pos {
-		res += fmt.Sprintf("(%d,%d)", identifier.pos, identifier.site)
+		res += fmt.Sprintf("(%d,%d)", identifier.Pos, identifier.Site)
 	}
 	return res
 }

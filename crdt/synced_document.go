@@ -2,6 +2,7 @@ package crdt
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
 )
@@ -10,14 +11,21 @@ type SyncedDocument struct {
 	site int
 	updateManager DocumentUpdateManager
 	Document     Document
+	toCall chan *utils.PackedDocument
+	lastIndex int
 }
 
 func NewSynchedDoc(site int) *SyncedDocument {
 	serverUrl := "localhost:8081"
 	doc := NewBasicDocument(NewBasicPositionManager())
-	synchedDoc := SyncedDocument{site, NewDocumentUpdateManager(serverUrl), doc}
+	synchedDoc := SyncedDocument{site, NewDocumentUpdateManager(serverUrl), doc, make(chan(*utils.PackedDocument)), 0}
 	go synchedDoc.sync()
+	go synchedDoc.handleActions()
 	return &synchedDoc
+}
+
+func (doc *SyncedDocument) Close() {
+	doc.toCall <- &utils.PackedDocument{"", "", "", "Done"}
 }
 
 func (doc *SyncedDocument) GetSite() int {
@@ -25,29 +33,40 @@ func (doc *SyncedDocument) GetSite() int {
 }
 
 func (doc *SyncedDocument) GetLastIndex() int {
-	return (*doc).Document.Length()
+	return doc.lastIndex
 }
 
 func (doc *SyncedDocument)InsertAtIndex(val string, index int, site int) Position {
-	position := doc.Document.InsertAtIndex(val, index, doc.site)
+	doc.lastIndex ++ 
+	position := doc.Document.GetInsertPosition(index, doc.site)
+	// position := doc.Document.InsertAtIndex(val, index, doc.site)
+	fmt.Printf("LAST INDEX IS _ %d", doc.lastIndex)
+	doc.toCall <- &utils.PackedDocument{strconv.Itoa(doc.site), BasicPositionToString(position.(BasicPosition)), val, "Insert"}
 	doc.updateManager.Insert(position, val, site)
 	return position
 }
 
 
 func (doc *SyncedDocument) InsertAtPosition(pos Position, val string) {
-	doc.Document.InsertAtPosition(pos, val)
+	doc.lastIndex ++
+	// doc.Document.InsertAtPosition(pos, val)
+	doc.toCall <- &utils.PackedDocument{strconv.Itoa(doc.site), BasicPositionToString(pos.(BasicPosition)), val, "Insert"}
 	// TODO: send server an acknowledgement request
 }
 
 func (doc *SyncedDocument) DeleteAtIndex(index int) {
-	position := doc.Document.DeleteAtIndex(index)
+	doc.lastIndex --
+	position := doc.Document.GetDeletePosition(index)
+	// position := doc.Document.DeleteAtIndex(index)
+	doc.toCall <- &utils.PackedDocument{strconv.Itoa(doc.site), BasicPositionToString(position.(BasicPosition)), "", "Delete"}
 	doc.updateManager.Delete(position, doc.site)
 }
 
 
 func (doc *SyncedDocument) DeleteAtPosition(pos Position) {
-	doc.Document.DeleteAtPosition(pos)
+	doc.lastIndex --
+	// doc.Document.DeleteAtPosition(pos)
+	doc.toCall <- &utils.PackedDocument{strconv.Itoa(doc.site), BasicPositionToString(pos.(BasicPosition)), "", "Delete"}
 	// TODO: send server an acknowledgement request
 }
 
@@ -77,5 +96,22 @@ func (doc *SyncedDocument)sync() {
 			}
 		}
 		// i--
+	}
+}
+
+func (doc *SyncedDocument)handleActions() {
+	
+	for {
+		packedDocument, ok := <-doc.toCall
+		if ok {
+			fmt.Printf("FROM CHANEL _ %s", packedDocument)
+			if packedDocument.Action == "Done" {
+				return
+			} else if packedDocument.Action=="Insert" {
+				doc.Document.InsertAtPosition(ToBasicPosition(packedDocument.Position), packedDocument.Value)
+			} else {
+				doc.Document.DeleteAtPosition(ToBasicPosition(packedDocument.Position))
+			}
+		}
 	}
 }
