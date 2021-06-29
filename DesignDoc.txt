@@ -91,6 +91,7 @@ CoreLibrary's Api:
      */
     DocumentInsertAt(fileDescriptor, char, index)
     DocumentDeleteAt(fileDescriptor, index)
+    DocumentChangeCursor(fileDescriptor, cursorIndex)
 
     /**** SAVING A DOCUMENT ON LOCAL STORAGE ****/
 
