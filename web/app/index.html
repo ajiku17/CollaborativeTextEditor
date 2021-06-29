@@ -1,14 +1,10 @@
 <!doctype html>
-<!--
-Copyright 2018 The Go Authors. All rights reserved.
-Use of this source code is governed by a BSD-style
-license that can be found in the LICENSE file.
--->
+
 <html>
 
 <head>
 	<meta charset="utf-8">
-	<title>Go wasm</title>
+	<title>Collaborative Text Editor</title>
 </head>
 
 <body>
@@ -30,22 +26,24 @@ license that can be found in the LICENSE file.
 		const go = new Go();
 		let mod, inst;
 
-		WebAssembly.instantiateStreaming(fetch(WASM_URL), go.importObject).then((result) => {
+		WebAssembly.instantiateStreaming(fetch(WASM_URL), go.importObject).then(async (result) => {
 			mod = result.module;
 			inst = result.instance;
-			document.getElementById("runButton").disabled = false;
+			await go.run(inst);
 		}).catch((err) => {
 			console.error(err);
 		});
 
-		async function run() {
-			console.clear();
-			await go.run(inst);
-			inst = await WebAssembly.instantiate(mod, go.importObject); // reset instance
-		}
 	</script>
 
-	<button onClick="run();" id="runButton" disabled>Run</button>
+	<link rel="stylesheet" href="css/codemirror.css">
+	<script src="lib/codemirror.js"></script>
+
+
+	<label for="collaborative-text-editor"></label>
+	<textarea id="collaborative-text-editor" name="text-editor" rows="4" cols="50">Hello world</textarea>
+	<script src="js/editor.js"></script>
+
 </body>
 
 </html>
