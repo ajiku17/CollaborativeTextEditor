@@ -39,9 +39,17 @@
 	<link rel="stylesheet" href="css/codemirror.css">
 	<script src="lib/codemirror.js"></script>
 
+	<div>
+		<button type="button" onclick="openNewDoc()">New</button>
+		<input type="file" id="inputElement">
+		<button type="button" onclick="saveLocal()">Save</button>
+		<button type="button" onclick="closeDoc()">Close</button>
+	</div>
+
+	<br>
 
 	<label for="collaborative-text-editor"></label>
-	<textarea id="collaborative-text-editor" name="text-editor" rows="4" cols="50">Hello world</textarea>
+	<textarea id="collaborative-text-editor" name="text-editor" rows="4" cols="50"></textarea>
 	<script src="js/editor.js"></script>
 
 </body>
