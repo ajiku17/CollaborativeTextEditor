@@ -69,8 +69,8 @@ CoreLibrary's Api:
      * The tricky part:
      *      How to get this peer up and running so that it doesn't miss any updates in the process?
      */
-    DocumentOpen(magnetLink, onChangeListener) -> fileDescriptor
-    DocumentDeserialize(localFileBinary, onChangeListener) -> fileDescriptor
+    DocumentOpen(magnetLink, initCallback) -> fileDescriptor
+    DocumentDeserialize(localFileBinary, initCallback) -> fileDescriptor
     DocumentNew() -> fileDescriptor
 
     /**** CLOSING A DOCUMENT ****/
