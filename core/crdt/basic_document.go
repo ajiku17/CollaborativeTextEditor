@@ -3,9 +3,7 @@ package crdt
 import (
 	"bytes"
 	"encoding/gob"
-	"github.com/ajiku17/CollaborativeTextEditor/utils"
 	"log"
-	"math"
 )
 
 type Element struct {
@@ -14,7 +12,6 @@ type Element struct {
 }
 
 type BasicDocument struct {
-	ID              DocumentID
 	Elems           []Element
 	PositionManager PositionManager
 }
@@ -22,7 +19,6 @@ type BasicDocument struct {
 func NewBasicDocument(positionManager PositionManager) *BasicDocument {
 	doc := new(BasicDocument)
 
-	doc.ID = DocumentID(utils.RandBetween(0, math.MaxInt32))
 	doc.Elems = []Element{}
 	doc.PositionManager = positionManager
 
@@ -34,10 +30,6 @@ func NewBasicDocument(positionManager PositionManager) *BasicDocument {
 
 func (doc *BasicDocument) Length() int {
 	return len(doc.Elems) - 2
-}
-
-func (doc *BasicDocument) DocumentID() DocumentID {
-	return doc.ID
 }
 
 func (doc *BasicDocument) InsertAtIndex(val string, index, site int) Position {
@@ -143,12 +135,7 @@ func (doc *BasicDocument) Serialize() ([]byte, error) {
 	w := new(bytes.Buffer)
 	e := gob.NewEncoder(w)
 
-	err := e.Encode(doc.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	err = e.Encode(doc.Elems)
+	err := e.Encode(doc.Elems)
 	if err != nil {
 		return nil, err
 	}
@@ -160,12 +147,7 @@ func (doc *BasicDocument) Deserialize(data []byte) error {
 	r := bytes.NewBuffer(data)
 	d := gob.NewDecoder(r)
 
-	err := d.Decode(&doc.ID)
-	if err != nil {
-		return err
-	}
-
-	err = d.Decode(&doc.Elems)
+	err := d.Decode(&doc.Elems)
 	if err != nil {
 		return err
 	}

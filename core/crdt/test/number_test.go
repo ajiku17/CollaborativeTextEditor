@@ -1,7 +1,7 @@
 package test
 
 import (
-	"github.com/ajiku17/CollaborativeTextEditor/crdt"
+	"github.com/ajiku17/CollaborativeTextEditor/core/crdt"
 	"testing"
 )
 
