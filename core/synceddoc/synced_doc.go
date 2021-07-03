@@ -12,7 +12,7 @@ type SyncedDocument struct {
 	cursorPosition int
 
 	localDocument crdt.Document
-	syncManager   network.SyncManager
+	syncManager   network.Manager
 }
 
 // New creates a new, empty document
@@ -40,7 +40,7 @@ func (syncedDoc *SyncedDocument) GetID() utils.UUID {
 	return ""
 }
 
-func (syncedDoc *SyncedDocument) SetOnChangeListener(listener OnChangeListener) {
+func (syncedDoc *SyncedDocument) SetOnChangeListener(listener ChangeListener) {
 
 }
 

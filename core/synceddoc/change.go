@@ -1,6 +1,8 @@
 package synceddoc
 
-import "github.com/ajiku17/CollaborativeTextEditor/utils"
+import (
+	"github.com/ajiku17/CollaborativeTextEditor/utils"
+)
 
 const CHANGE_INSERT      = "insert"
 const CHANGE_DELETE      = "delete"

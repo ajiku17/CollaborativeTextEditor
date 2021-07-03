@@ -4,16 +4,16 @@ import (
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
 )
 
-// OnChangeListener
+// ChangeListener
 // change is one of several types:
 //  ------------------
 // | ChangeInsert     |
 // | ChangeDelete     |
 // | ChangePeerCursor |
-type OnChangeListener func (changeName string, change interface {})
+type ChangeListener func (changeName string, change interface {})
 
 type PeerConnectedListener func (peerId utils.UUID, cursorPosition int)
-type PeerDisconnectedListener func (changeName string, change interface {})
+type PeerDisconnectedListener func (peerId utils.UUID)
 
 type Document interface {
 	GetID() utils.UUID
@@ -21,7 +21,7 @@ type Document interface {
 	/*
 	 * Sets listeners
 	 */
-	SetOnChangeListener(listener OnChangeListener)
+	SetOnChangeListener(listener ChangeListener)
 	SetPeerConnectedListener(listener PeerConnectedListener)
 	SetPeerDisconnectedListener(listener PeerDisconnectedListener)
 
