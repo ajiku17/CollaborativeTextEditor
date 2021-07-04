@@ -5,8 +5,8 @@ import (
 )
 
 type DataReceiveListener func (data []byte)
-type PeerConnectedListener func (peerId utils.UUID, cursorPosition int)
-type PeerDisconnectedListener func (peerId utils.UUID)
+type PeerConnectedListener func (peerId utils.UUID, aux []byte)
+type PeerDisconnectedListener func (peerId utils.UUID, aux []byte)
 
 type Manager interface {
 
@@ -22,6 +22,9 @@ type Manager interface {
 	// before calling Start
 	Connect()
 
-	// Disconnect terminates established connections and frees resources
+	// Disconnect terminates established connections
 	Disconnect()
+
+	// Kill frees resources and
+	Kill()
 }

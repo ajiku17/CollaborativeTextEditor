@@ -15,6 +15,14 @@ type SyncedDocument struct {
 	syncManager   network.Manager
 }
 
+func (syncedDoc *SyncedDocument) Connect() {
+	panic("implement me")
+}
+
+func (syncedDoc *SyncedDocument) Disconnect() {
+	panic("implement me")
+}
+
 // New creates a new, empty document
 func New() Document {
 	syncedDoc := new (SyncedDocument)
@@ -40,7 +48,7 @@ func (syncedDoc *SyncedDocument) GetID() utils.UUID {
 	return ""
 }
 
-func (syncedDoc *SyncedDocument) SetOnChangeListener(listener ChangeListener) {
+func (syncedDoc *SyncedDocument) SetChangeListener(listener ChangeListener) {
 
 }
 
@@ -56,7 +64,7 @@ func (syncedDoc *SyncedDocument) Serialize() []byte {
 	return []byte{}
 }
 
-func (syncedDoc *SyncedDocument) InsertAtIndex(index int) {
+func (syncedDoc *SyncedDocument) InsertAtIndex(index int, val string) {
 
 }
 
