@@ -12,7 +12,15 @@ type SyncedDocument struct {
 	cursorPosition int
 
 	localDocument crdt.Document
-	syncManager   network.SyncManager
+	syncManager   network.Manager
+}
+
+func (syncedDoc *SyncedDocument) Connect() {
+	panic("implement me")
+}
+
+func (syncedDoc *SyncedDocument) Disconnect() {
+	panic("implement me")
 }
 
 // New creates a new, empty document
@@ -40,7 +48,7 @@ func (syncedDoc *SyncedDocument) GetID() utils.UUID {
 	return ""
 }
 
-func (syncedDoc *SyncedDocument) SetOnChangeListener(listener OnChangeListener) {
+func (syncedDoc *SyncedDocument) SetChangeListener(listener ChangeListener) {
 
 }
 
@@ -56,7 +64,7 @@ func (syncedDoc *SyncedDocument) Serialize() []byte {
 	return []byte{}
 }
 
-func (syncedDoc *SyncedDocument) InsertAtIndex(index int) {
+func (syncedDoc *SyncedDocument) InsertAtIndex(index int, val string) {
 
 }
 
