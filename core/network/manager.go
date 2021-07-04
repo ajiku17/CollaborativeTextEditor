@@ -4,17 +4,17 @@ import (
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
 )
 
-type DataReceiveListener func (data []byte)
-type PeerConnectedListener func (peerId utils.UUID, aux []byte)
-type PeerDisconnectedListener func (peerId utils.UUID, aux []byte)
+type MessageReceiveListener func (message interface{})
+type PeerConnectedListener func (peerId utils.UUID, aux interface{})
+type PeerDisconnectedListener func (peerId utils.UUID, aux interface{})
 
 type Manager interface {
 
-	SetOnDataReceiveListener(listener DataReceiveListener)
+	SetOnDataReceiveListener(listener MessageReceiveListener)
 	SetPeerConnectedListener(listener PeerConnectedListener)
 	SetPeerDisconnectedListener(listener PeerDisconnectedListener)
 
-	BroadcastChange(change interface {})
+	BroadcastMessage(message interface{})
 
 	// Connect establishes necessary connections and enables
 	// receiving and sending changes to and from network.
