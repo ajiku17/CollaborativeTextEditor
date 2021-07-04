@@ -1,7 +1,7 @@
 package test
 
 import (
-	"github.com/ajiku17/CollaborativeTextEditor/crdt"
+	"github.com/ajiku17/CollaborativeTextEditor/core/crdt"
 	"log"
 	"testing"
 
@@ -24,27 +24,22 @@ func DocumentInsertAtIndex(t *testing.T, newDocumentInstance func () crdt.Docume
 	
 	// #1
 	document := newDocumentInstance()
-	docID := document.DocumentID()
 
 	text := "Hi everyone!"
 	InsertAtBottom(document, text)
 	AssertTrue(t, document.Length() == 12)
-	AssertTrue(t, document.DocumentID() == docID)
 	AssertTrue(t, document.ToString() == text)
 
 	// #2
 	document = newDocumentInstance()
-	docID = document.DocumentID()
 	
 	text = "Hello again!"
 	InsertAtTop(document, utils.Reverse(text))
 	AssertTrue(t, document.Length() == 12)
-	AssertTrue(t, document.DocumentID() == docID)
 	AssertTrue(t, document.ToString() == text)
 
 	// #3
 	document = newDocumentInstance()
-	docID = document.DocumentID()
 
 	document.InsertAtIndex("e", 0, 1)
 	document.InsertAtIndex("l", 1, 4)
@@ -52,7 +47,6 @@ func DocumentInsertAtIndex(t *testing.T, newDocumentInstance func () crdt.Docume
 	document.InsertAtIndex("l", 1, 1)
 	document.InsertAtIndex("!", 4, 2)
 	document.InsertAtIndex("H", 0, 4)
-	AssertTrue(t, document.DocumentID() == docID)
 	AssertTrue(t, document.Length() == 6)
 	AssertTrue(t, document.ToString() == "Hello!")
 }
@@ -61,17 +55,14 @@ func DocumentDeleteAtIndex(t *testing.T, newDocumentInstance func () crdt.Docume
 
 	// #1
 	document := newDocumentInstance()
-	docID := document.DocumentID()
 
 	text := "Hi everyone!"
 	InsertAtBottom(document, text)
-	AssertTrue(t, document.DocumentID() == docID)
 	AssertTrue(t, document.Length() == 12)
 	AssertTrue(t, document.ToString() == text)
 
 	document.DeleteAtIndex(0)
 	document.DeleteAtIndex(0)
-	AssertTrue(t, document.DocumentID() == docID)
 	AssertTrue(t, document.Length() == 10)
 	AssertTrue(t, document.ToString() == " everyone!")
 
@@ -80,13 +71,11 @@ func DocumentDeleteAtIndex(t *testing.T, newDocumentInstance func () crdt.Docume
 	document.InsertAtIndex("l", 2, 4)
 	document.InsertAtIndex("l", 3, 1)
 	document.InsertAtIndex("o", 4, 1)
-	AssertTrue(t, document.DocumentID() == docID)
 	AssertTrue(t, document.Length() == 15)
 	AssertTrue(t, document.ToString() == "Hello everyone!")
 
 	// #2
 	document = newDocumentInstance()
-	docID = document.DocumentID()
 
 	document.InsertAtIndex("H", 0, 1)
 	document.InsertAtIndex("i", 1, 4)
@@ -100,7 +89,6 @@ func DocumentDeleteAtIndex(t *testing.T, newDocumentInstance func () crdt.Docume
 	document.InsertAtIndex("n", 9, 4)
 	document.InsertAtIndex("e", 10, 1)
 	document.InsertAtIndex("!", 11, 1)
-	AssertTrue(t, document.DocumentID() == docID)
 	AssertTrue(t, document.Length() == 12)
 	AssertTrue(t, document.ToString() == "Hi everyone!")
 
@@ -112,7 +100,6 @@ func DocumentDeleteAtIndex(t *testing.T, newDocumentInstance func () crdt.Docume
 	document.DeleteAtIndex(3)
 	document.DeleteAtIndex(3)
 	document.DeleteAtIndex(3)
-	AssertTrue(t, document.DocumentID() == docID)
 	AssertTrue(t, document.Length() == 4)
 	AssertTrue(t, document.ToString() == "Hi !")
 
@@ -121,7 +108,6 @@ func DocumentDeleteAtIndex(t *testing.T, newDocumentInstance func () crdt.Docume
 	document.InsertAtIndex("l", 5, 4)
 	document.InsertAtIndex("k", 6, 1)
 	document.InsertAtIndex("s", 7, 1)
-	AssertTrue(t, document.DocumentID() == docID)
 	AssertTrue(t, document.Length() == 9)
 	AssertTrue(t, document.ToString() == "Hi folks!")
 }
@@ -131,7 +117,6 @@ func DocInsertAtPosition(t *testing.T, newDocumentInstance func () crdt.Document
 	document := newDocumentInstance()
 	manager := newManagerInstance()
 
-	docID := document.DocumentID()
 	text := "Hi everyone!"
 	prev := manager.GetMinPosition()
 	next := manager.GetMaxPosition()
@@ -154,13 +139,11 @@ func DocInsertAtPosition(t *testing.T, newDocumentInstance func () crdt.Document
 		document.InsertAtPosition(e.pos, e.val)
 	}
 
-	AssertTrue(t, document.DocumentID() == docID)
 	AssertTrue(t, document.Length() == 12)
 	AssertTrue(t, document.ToString() == "Hi everyone!")
 
 	// #2
 	document = newDocumentInstance()
-	docID = document.DocumentID()
 
 	shuffled := positions[:]
 	for i := range shuffled {
@@ -174,7 +157,6 @@ func DocInsertAtPosition(t *testing.T, newDocumentInstance func () crdt.Document
 		document.InsertAtPosition(e.pos, e.val)
 	}
 
-	AssertTrue(t, document.DocumentID() == docID)
 	AssertTrue(t, document.Length() == 12)
 	AssertTrue(t, document.ToString() == "Hi everyone!")
 }
@@ -184,7 +166,6 @@ func DocDeleteAtPos(t *testing.T, newDocumentInstance func () crdt.Document, new
 	manager := newManagerInstance()
 
 	// #1
-	docID := document.DocumentID()
 	text := "Hi everyone!"
 	prev := manager.GetMinPosition()
 	next := manager.GetMaxPosition()
@@ -207,7 +188,6 @@ func DocDeleteAtPos(t *testing.T, newDocumentInstance func () crdt.Document, new
 		document.InsertAtPosition(e.pos, e.val)
 	}
 
-	AssertTrue(t, document.DocumentID() == docID)
 	AssertTrue(t, document.Length() == 12)
 	AssertTrue(t, document.ToString() == "Hi everyone!")
 
@@ -222,14 +202,12 @@ func DocDeleteAtPos(t *testing.T, newDocumentInstance func () crdt.Document, new
 	for i := 0; i < len(shuffled); i++ {
 		document.DeleteAtPosition(shuffled[i].pos)
 	}
-	AssertTrue(t, document.DocumentID() == docID)
 	AssertTrue(t, document.Length() == 3)
 	AssertTrue(t, document.ToString() == "Hi!")
 }
 
 func DocSerializeDeserialize(t *testing.T, newDocumentInstance func () crdt.Document) {
 	document := newDocumentInstance()
-	docID := document.DocumentID()
 	siteID := utils.RandBetween(1, 5)
 
 	document.InsertAtIndex("H", 0, siteID)
@@ -247,14 +225,12 @@ func DocSerializeDeserialize(t *testing.T, newDocumentInstance func () crdt.Docu
 	serialized, err := document.Serialize()
 	AssertTrue(t, err == nil)
 	AssertTrue(t, document.ToString() == "Hello World")
-	AssertTrue(t, document.DocumentID() == docID)
 
 	deserializedDoc := newDocumentInstance()
 
 	err = deserializedDoc.Deserialize(serialized)
 	AssertTrue(t, err == nil)
 
-	AssertTrue(t, deserializedDoc.DocumentID() == document.DocumentID())
 	AssertTrue(t, deserializedDoc.Length() == document.Length())
 	AssertTrue(t, deserializedDoc.ToString() == document.ToString())
 
