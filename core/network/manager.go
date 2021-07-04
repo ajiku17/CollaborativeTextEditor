@@ -10,7 +10,7 @@ type PeerDisconnectedListener func (peerId utils.UUID, aux interface{})
 
 type Manager interface {
 
-	SetOnDataReceiveListener(listener MessageReceiveListener)
+	SetOnMessageReceiveListener(listener MessageReceiveListener)
 	SetPeerConnectedListener(listener PeerConnectedListener)
 	SetPeerDisconnectedListener(listener PeerDisconnectedListener)
 
