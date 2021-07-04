@@ -16,12 +16,32 @@ func ToBytes(packedDocument PackedDocument) []byte {
 	return []byte(fullData)
 }
 
-func FromBytes(data []byte) PackedDocument {
-	tokenizedData := bytes.Split(data, []byte("\n"))
+func FromBytes(data [][]byte) PackedDocument {
 	packedDocument := PackedDocument{}
-	packedDocument.Site = string(tokenizedData[0])
-	packedDocument.Position = string(tokenizedData[1])
-	packedDocument.Value = string(tokenizedData[2])
-	packedDocument.Action = string(tokenizedData[3])
+	packedDocument.Site = string(data[0])
+	packedDocument.Position = string(data[1])
+	packedDocument.Value = string(data[2])
+	packedDocument.Action = string(data[3])
 	return packedDocument
+}
+
+
+func GetPackedDocuments(data []byte) []PackedDocument {
+	var documents []PackedDocument
+	var dataToConvert [][]byte
+	lines := bytes.Split(data, []byte("\n"))
+	for _, line := range lines {
+		dataToConvert = append(dataToConvert, line)
+		if len(dataToConvert) == 4 {
+			var packedDocument = FromBytes(dataToConvert)
+			documents = append(documents, packedDocument)
+			dataToConvert = dataToConvert[:0]
+		}
+	}
+	return documents
+}
+
+func GetCopy(packedDocument PackedDocument) PackedDocument {
+	copy := PackedDocument{packedDocument.Site, packedDocument.Position, packedDocument.Value, packedDocument.Action}
+	return copy
 }

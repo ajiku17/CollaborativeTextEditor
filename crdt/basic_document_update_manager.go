@@ -37,22 +37,27 @@ func NewDocumentUpdateManager(serverUrl string) *BasicDocumentUpdateManager {
 	}
 }
 
+func (manager *BasicDocumentUpdateManager) ConnectWithServer(site int) {
+	toBytes := utils.ToBytes(utils.PackedDocument{strconv.Itoa(site), "", "", "Connect"})
+	manager.sendRequest(toBytes)
+}
+
 func (manager *BasicDocumentUpdateManager) Insert(position Position, val string, site int) {
 	toBytes := utils.ToBytes(utils.PackedDocument{strconv.Itoa(site), BasicPositionToString(position.(BasicPosition)), val, "Insert"})
-	manager.sendRequest(toBytes, "Insert")
+	manager.sendRequest(toBytes)
 }
 
 
 func (manager *BasicDocumentUpdateManager) Delete(position Position, site int) {
 	toBytes := utils.ToBytes(utils.PackedDocument{strconv.Itoa(site), BasicPositionToString(position.(BasicPosition)), "", "Delete"})
-	manager.sendRequest(toBytes, "Delete")
+	manager.sendRequest(toBytes)
 }
 
-func (manager *BasicDocumentUpdateManager)sendRequest(data []byte, actionName string){
+func (manager *BasicDocumentUpdateManager)sendRequest(data []byte){
 	socket := manager.socket
 	for {
 		_, err := socket.Write(data)
-		fmt.Printf("Client send %s\n", data)
+		// fmt.Printf("Client send %s\n", data)
 		if err != nil {
 			socket.SetDeadline(time.Now().Add(time.Second))
 			continue
@@ -65,6 +70,7 @@ func (manager *BasicDocumentUpdateManager)sendRequest(data []byte, actionName st
 
 func (manager *BasicDocumentUpdateManager)AddListener() {
 	socket := manager.socket
+	fmt.Printf("Listening to %s\n", socket)
 	for {
 		received := make([]byte, 1024)
 		_, err := socket.Read(received)
@@ -72,9 +78,12 @@ func (manager *BasicDocumentUpdateManager)AddListener() {
 			socket.SetDeadline(time.Now().Add(time.Second))
 			continue
 		}
+
 		fmt.Printf("Listener Received %s\n", received)
-		var packedDocument = utils.FromBytes(received)
-		manager.toNotify <- &packedDocument
+
+		for _, data := range utils.GetPackedDocuments(received) {
+			manager.toNotify <- &data
+		}
 	}
 }
 

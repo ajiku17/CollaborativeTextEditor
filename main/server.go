@@ -3,15 +3,15 @@ package main
 import (
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
-	"github.com/ajiku17/CollaborativeTextEditor/crdt"
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
 )
 
 type Server struct {
-	SyncedDocuments []*(crdt.SyncedDocument)
-	connectedSockets map[net.Conn]string
+	ConnectedSockets map[net.Conn]string
+	lock *sync.Mutex
 }
 
 var server *Server
@@ -19,8 +19,9 @@ var server *Server
 func NewServer() *Server {
 	if server == nil {
 		server = &Server{}
+		server.ConnectedSockets = make(map[net.Conn]string)
+		server.lock = &sync.Mutex{}
 	}
-	server.connectedSockets = make(map[net.Conn]string)
 	go server.Listen()
 	return server
 }
@@ -40,23 +41,21 @@ func (server *Server)Listen() {
 				return
 		}
 		socket.SetDeadline(time.Now().Add(time.Second))
-		server.connectedSockets[socket] = ""
 		go server.HandleRequest(socket)
 	}
 }
 
-func sendAll(data utils.PackedDocument){
+func (server *Server)sendAll(data utils.PackedDocument){
 	// Send request to all clients
-	for socket, site := range server.connectedSockets {
+	server.lock.Lock()
+	for socket, site := range server.ConnectedSockets {
+		fmt.Printf("trying to send(range %d), curr site - %d, foreach site - %d, value - %s\n",len(server.ConnectedSockets), data.Site, site, data.Value)
 		if site != data.Site {
-			fmt.Printf("Server Send %s\n", utils.ToBytes(data))
+			fmt.Printf("Server Send %s into %s\n", utils.ToBytes(data), socket)
 			socket.Write(utils.ToBytes(data))
 		}
 	}
-}
-
-func (server *Server)ConnectWithClient(doc *crdt.SyncedDocument) {
-	server.SyncedDocuments = append(server.SyncedDocuments, doc)
+	server.lock.Unlock()
 }
 
 func (server *Server) HandleRequest(socket net.Conn) {
@@ -67,22 +66,29 @@ func (server *Server) HandleRequest(socket net.Conn) {
 				socket.SetDeadline(time.Now().Add(time.Second))
 				continue
 		}
-		
-		if string(receivedMessage) == "Done"{
-				continue
-		}
 
 		fmt.Printf("Server received %s\n", receivedMessage)
-
-		var packedDocument = utils.FromBytes(receivedMessage)
-
-		server.setSocketSite(packedDocument.Site, socket)
-		
-		sendAll(packedDocument)
-		
+		for _, data := range utils.GetPackedDocuments(receivedMessage) {
+			fmt.Printf("Server received as packedDocument %s\n", data)
+			if data.Action == "Connect" {
+				server.setSocketSite(data.Site, socket)
+			} else {
+				go server.sendAll(data)
+			}
+		}
 	}
 }
 
 func (server *Server) setSocketSite(site string, socket net.Conn) {
-	server.connectedSockets[socket] = site
+	server.ConnectedSockets[socket] = site
+	fmt.Printf("Connected clients  - %s ; size - %d\n", server.ConnectedSockets, len(server.ConnectedSockets))
+}
+
+func (server *Server) IsConnected(site string) bool {
+	for _, curr_site := range server.ConnectedSockets {
+		if curr_site == site {
+			return true
+		}
+	}
+	return false
 }
