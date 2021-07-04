@@ -2,14 +2,27 @@ package main
 
 import (
 	"fmt"
-	"github.com/ajiku17/CollaborativeTextEditor/crdt"
+	"github.com/ajiku17/CollaborativeTextEditor/core/synceddoc"
+	"github.com/ajiku17/CollaborativeTextEditor/utils"
 	"syscall/js"
 )
 
 var docManager *DocumentManager
 
 func DocumentOpen(this js.Value, i []js.Value) interface {} {
-	return nil
+	documentId := i[0].String()
+	initCallback := i[1]
+
+	doc, err := synceddoc.Open(documentId)
+	if err != nil {
+		fmt.Println("error: ", err)
+		return nil
+	}
+
+	fd := docManager.PutDocument(doc)
+	initCallback.Invoke(doc.ToString())
+
+	return fd
 }
 
 func DocumentDeserialize(this js.Value, i []js.Value) interface {} {
@@ -20,8 +33,7 @@ func DocumentDeserialize(this js.Value, i []js.Value) interface {} {
 
 	js.CopyBytesToGo(serialized, i[0])
 
-	doc := crdt.NewBasicDocument(crdt.NewBasicPositionManager())
-	err := doc.Deserialize(serialized)
+	doc, err := synceddoc.Load(serialized)
 	if err != nil {
 		fmt.Println("error: ", err)
 		return nil
@@ -36,7 +48,7 @@ func DocumentDeserialize(this js.Value, i []js.Value) interface {} {
 }
 
 func DocumentNew(this js.Value, i []js.Value) interface {} {
-	doc := crdt.NewBasicDocument(crdt.NewBasicPositionManager())
+	doc := synceddoc.New()
 
 	fd := docManager.PutDocument(doc)
 
@@ -46,7 +58,17 @@ func DocumentNew(this js.Value, i []js.Value) interface {} {
 func DocumentClose(this js.Value, i []js.Value) interface {} {
 	fd := i[0].Int()
 
+	doc, err := docManager.GetDocument(FileDescriptor(fd))
+
+	if err != nil {
+		fmt.Println("error: ", err)
+		return nil
+	}
+
+	doc.Close()
+
 	docManager.RemoveDocument(FileDescriptor(fd))
+
 	return nil
 }
 
@@ -58,11 +80,11 @@ func DocumentInsertAt(this js.Value, i []js.Value) interface {} {
 	doc, err := docManager.GetDocument(FileDescriptor(fd))
 
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("error: ", err)
 		return -1
 	}
 
-	doc.InsertAtIndex(value, index, 1)
+	doc.InsertAtIndex(index, value)
 
 	fmt.Printf("Calling DocumentInsertAt on fd: %v index: %d, value: %s after insert: %s\n", fd, index, value, doc.ToString())
 	return nil
@@ -96,6 +118,7 @@ func DocumentChangeCursor(this js.Value, i []js.Value) interface {} {
 		return -1
 	}
 
+	doc.SetCursor(index)
 	fmt.Printf("Calling DocumentChangeCursor on fd: %v index: %d doc: %s\n", fd, index, doc.ToString())
 	return nil
 }
@@ -109,10 +132,7 @@ func DocumentSerialize(this js.Value, i []js.Value) interface {} {
 		return []interface{}{-1}
 	}
 
-	serialized, err := doc.Serialize()
-	if err != nil {
-		return nil
-	}
+	serialized := doc.Serialize()
 
 	res := make([]interface{}, len(serialized))
 
@@ -123,7 +143,55 @@ func DocumentSerialize(this js.Value, i []js.Value) interface {} {
 	return res
 }
 
-func DocumentAddListener(this js.Value, i []js.Value) interface {} {
+func SetChangeListener(doc synceddoc.Document, callback js.Value) {
+	doc.SetChangeListener(func (changeName string, change interface {}) {
+		changeObj := make(map[string]interface{})
+
+		changeObj["changeName"] = changeName
+
+		switch change.(type) {
+		case synceddoc.ChangeInsert:
+			changeObj["index"] = change.(synceddoc.ChangeInsert).Index
+			changeObj["value"] = change.(synceddoc.ChangeInsert).Value
+		case synceddoc.ChangeDelete:
+			changeObj["index"] = change.(synceddoc.ChangeDelete).Index
+		case synceddoc.ChangePeerCursor:
+			changeObj["peerId"] = change.(synceddoc.ChangePeerCursor).PeerID
+			changeObj["cursorPos"] = change.(synceddoc.ChangePeerCursor).CursorPosition
+		}
+
+		callback.Invoke(changeName, changeObj)
+	})
+}
+
+func SetPeerConnectedListener(doc synceddoc.Document, callback js.Value) {
+	doc.SetPeerConnectedListener(func (peerId utils.UUID, cursorPosition int) {
+		callback.Invoke(string(peerId), cursorPosition)
+	})
+}
+
+func SetPeerDisconnectedListener(doc synceddoc.Document, callback js.Value) {
+	doc.SetPeerDisconnectedListener(func (peerId utils.UUID) {
+		callback.Invoke(string(peerId))
+	})
+}
+
+func DocumentSetListener(this js.Value, i []js.Value) interface {} {
+	fd := i[0].Int()
+	callbackName := i[1].String()
+	callback := i[2]
+
+	doc, err := docManager.GetDocument(FileDescriptor(fd))
+
+	if err != nil {
+		return -1
+	}
+
+	switch callbackName {
+	case "onChange": SetChangeListener(doc, callback)
+	case "onPeerConnect": SetPeerConnectedListener(doc, callback)
+	case "onPeerDisconnect": SetPeerDisconnectedListener(doc, callback)
+	}
 
 	return nil
 }
@@ -137,7 +205,7 @@ func registerCallbacks() {
 	js.Global().Set("DocumentDeleteAt", js.FuncOf(DocumentDeleteAt))
 	js.Global().Set("DocumentChangeCursor", js.FuncOf(DocumentChangeCursor))
 	js.Global().Set("DocumentSerialize", js.FuncOf(DocumentSerialize))
-	js.Global().Set("DocumentAddListener", js.FuncOf(DocumentAddListener))
+	js.Global().Set("DocumentSetListener", js.FuncOf(DocumentSetListener))
 }
 
 func main() {

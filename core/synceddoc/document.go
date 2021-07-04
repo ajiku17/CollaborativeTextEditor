@@ -54,6 +54,8 @@ type Document interface {
 	 * Closes the document, frees resources. Document becomes non editable.
 	 */
 	Close()
+
+	ToString() string
 }
 
 /*

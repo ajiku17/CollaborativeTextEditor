@@ -16,11 +16,11 @@ type SyncedDocument struct {
 }
 
 func (syncedDoc *SyncedDocument) Connect() {
-	panic("implement me")
+
 }
 
 func (syncedDoc *SyncedDocument) Disconnect() {
-	panic("implement me")
+
 }
 
 // New creates a new, empty document
@@ -31,17 +31,17 @@ func New() Document {
 }
 
 // Open downloads a document having the specified ID
-func Open(docId string) Document {
+func Open(docId string) (Document, error) {
 	syncedDoc := new (SyncedDocument)
 
-	return syncedDoc
+	return syncedDoc, nil
 }
 
 // Load deserializes serializedData and creates a document
-func Load(serializedData []byte) Document {
+func Load(serializedData []byte) (Document, error) {
 	syncedDoc := new (SyncedDocument)
 
-	return syncedDoc
+	return syncedDoc, nil
 }
 
 func (syncedDoc *SyncedDocument) GetID() utils.UUID {
@@ -78,4 +78,8 @@ func (syncedDoc *SyncedDocument) SetCursor(index int) {
 
 func (syncedDoc *SyncedDocument) Close() {
 
+}
+
+func (syncedDoc *SyncedDocument) ToString() string {
+	return ""
 }
