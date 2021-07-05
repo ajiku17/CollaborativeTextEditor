@@ -1,0 +1,202 @@
+Design Doc
+
+Abstract
+--------------------------
+We are building a library for collaborative text editing.
+It is based on CRDTs and operates on a P2P network.
+It is also network-agnostic, meaning it is able to operate on a
+variety of network types.
+
+
+Deliverables
+========================================
+A collaborative text editor.
+
+Users can edit their files either online or offline. Users can save their documents on local storage.
+
+Every peer has its own replica of the text document, information about this peer and its replica is placed on a central tracking server.
+
+When another peer wants to join a collaborative session on a given document with other peers, it only
+needs to know a magnetic link. The user puts this address into a browser, which will connect to our web server.
+This webserver will serve the user web application resources as well as the core library.
+
+The client side js(served by the web server) will parse the arguments of the url and determine which document the user has requested.
+
+Now the main interactions are between the client side javascript and the core library.
+
+To operate on a document, the user needs to call library's Open() method which will return a handle of this document.
+(Much like a unix file descriptor) Thereafter the client uses this handle to interact with the document.
+
+When a client makes a change, it will make a corresponding call into the library with the file handle returned from Open()
+and the library will propagate this change to other peers. This call is non-blocking.
+
+The library also provides signals notifying the user about document changes other peers have made.
+Users can register their callbacks and listen to these signals.
+
+Modules
+----------------------
+TrackingServer:
+    1. Single central server with knowledge of every documents location in the network
+
+WebApplication:
+    1. JS frontend text editor
+    2. Web server which will serve CoreLibrary's wasm binary
+
+CoreLibrary:
+    1. Implementation of a crdt document.
+    2. Document synchronization (over p2p or a central server)
+    3. TrackingServer client
+
+
+CoreLibrary's Api:
+----------------------
+    /**** LISTENERS ****/
+
+    type onChangeListener func (changeJSON string) // change can either be INSERT, DELETE or PEER_CURSOR_CHANGE
+                                                   // encoded in a JSON string
+    type peerConnected func(peerID, cursorPosition)
+    type peerDisconnected func(peerID)
+
+    /**** OPENING A DOCUMENT ****/
+
+    /*
+     * Library fetches meta information from the TrackingServer about the document specified by the magnet link.
+     * Registers this peer as an active editor of this document on the TrackingServer.
+     * After fetching the list of other peers, connects to all of them, notifies them about its existence, so that it can
+     * receive document updates from those peers, fetches data from one of them and becomes identical
+     * to that peer. From there, the synchronization takes place as usual with one more peer.
+     *
+     * The tricky part:
+     *      How to get this peer up and running so that it doesn't miss any updates in the process?
+     */
+    DocumentOpen(magnetLink, initCallback) -> fileDescriptor
+    DocumentDeserialize(localFileBinary, initCallback) -> fileDescriptor
+    DocumentNew() -> fileDescriptor
+
+    /**** CLOSING A DOCUMENT ****/
+
+    /*
+     * Notifies the tracking server that this peer is no longer actively editing the document, therefore
+     * it should be removed from tracking server's registry for this document.
+     * Called on application exit. Document becomes non editable.
+     */
+    DocumentClose(fileDescriptor)
+
+    /**** MODIFYING A DOCUMENT ****/
+
+    /*
+     * Modifies the internal crdt data structure.
+     * Clients should call these methods and wait for onChangeListener and only then make changes
+     * in the application.
+     */
+    DocumentInsertAt(fileDescriptor, char, index)
+    DocumentDeleteAt(fileDescriptor, index)
+    DocumentChangeCursor(fileDescriptor, cursorIndex)
+
+    /**** SAVING A DOCUMENT ON LOCAL STORAGE ****/
+
+    /*
+     * Given a file descriptor, serializes the corresponding document into a series of bytes, which
+     * can be persisted on local storage and later deserialized to continue the editing session.
+     */
+    DocumentSerialize(fileDescriptor) -> localFileBinary
+
+    /* Optional */
+    DocumentAddChangeListener(fileDescriptor, onChangeListener)
+
+MagnetLinks:
+----------------------
+    Magnet links will be composed of unique Document ids generated at document creation and will remain unique
+    throughout the document's existence. // A simple 64 bit integer will do for now
+
+DocumentSerialization:
+----------------------
+    Locally saved documents will be serialized.
+    This serialization will retain documents unique ID and other metadata along with inner CRDT data structure.
+
+
+TODO LIST
+    Relatively easy:
+        1. JS text editor: CodeMirror or something else
+        2. Port library API to wasm
+        3. Web server serving web resources (should be pretty small)
+        4. Add Serialization and Deserialization to CRDT Document interface
+        5. TrackingServer and TrackingServer client
+    Moderately difficult:
+        6. Unique document id generation
+        7. Magnet link generation
+        8. Unique peer(site) id generation
+        9. Non blocking document modifications
+    Hard stuff:
+        10. P2P network architecture
+            10.1 Document synchronization
+            10.2 Peers joining and leaving
+            10.3 Testing in unreliable network
+        11. Good CRDT implementation
+        12. Benchmarks
+
+
+
+Data structures
+--------------------------
+
+    CRDTs
+    ......
+    At the core of the library is a data structure, more precisely,
+    a data type, which can be represented with lot's of different data structures.
+
+    The data type in question is called Conflict-free Replicated Data type.
+    This data type has useful properties for collaborative text editing, most notably,
+    convergence, that is, after a same set of operations has been applied to two different
+    replicas of the same data type, their state is guaranteed to be identical. This property is
+    also called eventual consistency - eventually both replicas reach a consistent state with respect
+    to each other.
+
+
+    Our CRDT implementation
+    .........................
+    // Unique position of each element in the document.
+    // This position can be whatever the implementation requires.
+    type Position interface{}
+
+    // Methods every document should support.
+    // These methods operate on the inner state of the document.
+    type Document interface {
+    	InsertAtIndex(string, int, int) Position
+    	DeleteAtIndex(int) Position
+    	InsertAtPosition(Position, string)
+    	DeleteAtPosition(Position)
+    	ToString() string
+    	Length() int
+    }
+
+    // Manages the allocation scheme used by the specific implementation.
+    // There can be lots of different allocation strategies based on user behaviour.
+    type PositionManager interface {
+    	PositionIsLessThan(Position, Position) bool
+    	PositionsEqual(Position, Position) bool
+    	AllocPositionBetween(Position, Position, int) Position
+    	GetMaxPosition() Position
+    	GetMinPosition() Position
+    }
+
+Algorithms
+-----------------------
+Our work is inspired by the following research:
+https://hal.inria.fr/inria-00432368/document
+
+Each character in the document is accompanied by a unique position identifier
+which remains unique through out the existence of the document.
+
+Document is a collection of such tuples of characters and their position identifiers.
+
+This collection can be represented by an ordered list, a tree or a trie.
+
+Position allocation algorithm is also described in the above paper.
+
+The strategy by which the algorithm generates new unique IDs is borrowed from
+another paper:
+https://hal.archives-ouvertes.fr/hal-00921633/document
+
+
+

@@ -1,9 +1,10 @@
 package crdt
 
 import (
+	"bytes"
+	"encoding/gob"
 	"log"
 )
-
 
 type Element struct {
 	Data     string
@@ -15,12 +16,9 @@ type BasicDocument struct {
 	PositionManager PositionManager
 }
 
-func (doc *BasicDocument) Length() int {
-	return len(doc.Elems) - 2
-}
-
 func NewBasicDocument(positionManager PositionManager) *BasicDocument {
 	doc := new(BasicDocument)
+
 	doc.Elems = []Element{}
 	doc.PositionManager = positionManager
 
@@ -30,58 +28,33 @@ func NewBasicDocument(positionManager PositionManager) *BasicDocument {
 	return doc
 }
 
-
-func (doc *BasicDocument)GetInsertPosition(index int, site int) Position {
-	// if index < 0 || index > len(doc.Elems) - 2 {
-	// 	log.Fatalf("Document: invalid insert index %v", index)
-	// }
-
-	// if len(doc.Elems) < 2 {
-	// 	log.Fatal("Document: invalid document")
-	// }
-
-	prevPos := (doc.Elems[index]).Position
-	afterPos := (doc.Elems[index + 1]).Position
-	position := doc.PositionManager.AllocPositionBetween(prevPos, afterPos, site)	
-	return position
-}
-
-func (doc *BasicDocument)GetDeletePosition(index int) Position {
-	// if index < 0 || index > len(doc.Elems) - 2 {
-	// 	log.Fatalf("Document: invalid delete index %v", index)
-	// }
-
-	res := doc.Elems[index + 1].Position
-	return res
+func (doc *BasicDocument) Length() int {
+	return len(doc.Elems) - 2
 }
 
 func (doc *BasicDocument) InsertAtIndex(val string, index, site int) Position {
-	// if index < 0 || index > len(doc.Elems) - 2 {
-	// 	log.Fatalf("Document: invalid insert index %v", index)
-	// }
+	if index < 0 || index > len(doc.Elems) - 2 {
+		log.Fatalf("Document: invalid insert index %v", index)
+	}
 
-	// if len(doc.Elems) < 2 {
-	// 	log.Fatal("Document: invalid document")
-	// }
+	if len(doc.Elems) < 2 {
+		log.Fatal("Document: invalid document")
+	}
 
-	// prevPos := (doc.Elems[index]).Position
-	// afterPos := (doc.Elems[index + 1]).Position
-	// position := doc.PositionManager.AllocPositionBetween(prevPos, afterPos, site)
-	position := doc.GetInsertPosition(index, site)
+	prevPos := (doc.Elems[index]).Position
+	afterPos := (doc.Elems[index + 1]).Position
+	position := doc.PositionManager.AllocPositionBetween(prevPos, afterPos, site)
 	doc.DocInsert(index + 1, Element{val, position})
 
 	return position
 }
 
-func (doc *BasicDocument) DeleteAtIndex(index int) Position {
-	// if index < 0 || index > len(doc.Elems) - 2 {
-	// 	log.Fatalf("Document: invalid delete index %v", index)
-	// }
+func (doc *BasicDocument) DeleteAtIndex(index int) {
+	if index < 0 || index > len(doc.Elems) - 2 {
+		log.Fatalf("Document: invalid delete index %v", index)
+	}
 
-	// res := doc.Elems[index + 1].Position
-	res := doc.GetDeletePosition(index)
 	doc.DocDelete(index + 1)
-	return res
 }
 
 func (doc *BasicDocument) ToString() string {
@@ -156,4 +129,28 @@ func (doc *BasicDocument) DeleteAtPosition (pos Position) {
 	copyDoc = append(copyDoc, doc.Elems[index + 1:]...)
 
 	doc.Elems = copyDoc[:]
+}
+
+func (doc *BasicDocument) Serialize() ([]byte, error) {
+	w := new(bytes.Buffer)
+	e := gob.NewEncoder(w)
+
+	err := e.Encode(doc.Elems)
+	if err != nil {
+		return nil, err
+	}
+
+	return w.Bytes(), nil
+}
+
+func (doc *BasicDocument) Deserialize(data []byte) error {
+	r := bytes.NewBuffer(data)
+	d := gob.NewDecoder(r)
+
+	err := d.Decode(&doc.Elems)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

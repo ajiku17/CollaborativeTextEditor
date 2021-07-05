@@ -1,6 +1,7 @@
 package crdt
 
 import (
+	"encoding/gob"
 	"fmt"
 	"log"
 	"math"
@@ -11,6 +12,7 @@ import (
 )
 
 const base = math.MaxInt32
+
 
 type Identifier struct {
 	Pos  int
@@ -23,7 +25,9 @@ type BasicPositionManager struct {
 
 type BasicPosition []Identifier
 
-func NewBasicPositionManager() *BasicPositionManager{
+func NewBasicPositionManager() *BasicPositionManager {
+	gob.Register(BasicPosition{})
+
 	manager := new(BasicPositionManager)
 	manager.Base = base
 	NumberSetBase(manager.Base)

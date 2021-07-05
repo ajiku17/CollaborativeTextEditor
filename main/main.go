@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ajiku17/CollaborativeTextEditor/crdt"
+	"github.com/ajiku17/CollaborativeTextEditor/core/crdt"
 )
 
 func main() {

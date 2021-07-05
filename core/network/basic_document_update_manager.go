@@ -1,4 +1,4 @@
-package crdt
+package network
 
 import (
 	"fmt"
