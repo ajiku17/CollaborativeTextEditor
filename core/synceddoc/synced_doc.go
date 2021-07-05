@@ -34,6 +34,7 @@ func (doc *SyncedDocument) Disconnect() {
 
 func initDocState(doc *SyncedDocument) {
 	doc.siteId = utils.GenerateNewID()
+	doc.localDocument = crdt.NewBasicDocument(crdt.NewBasicPositionManager(doc.siteId))
 	doc.cursorPosition = 0
 	doc.peerCursorPositions = make(map[utils.UUID]int)
 	doc.killed = false
@@ -76,7 +77,7 @@ func setChangeListener(doc *SyncedDocument, listener ChangeListener) {
 			change := message.(ChangeCRDTDelete)
 			deleteIndex := doc.localDocument.DeleteAtPosition(change.Position)
 
-			listener(CHANGE_INSERT, ChangeDelete {Index: deleteIndex})
+			listener(CHANGE_DELETE, ChangeDelete {Index: deleteIndex})
 		case ChangePeerCursor:
 			listener(CHANGE_PEER_CURSOR, message)
 		}
@@ -84,12 +85,13 @@ func setChangeListener(doc *SyncedDocument, listener ChangeListener) {
 }
 
 // New creates a new, empty document
-func New(changeListener ChangeListener,
+func New(syncManager network.Manager, changeListener ChangeListener,
 	peerConnectedListener PeerConnectedListener,
 	peerDisconnectedListener PeerDisconnectedListener) Document {
 
 	syncedDoc := new (SyncedDocument)
 
+	syncedDoc.syncManager = syncManager
 	initDocState(syncedDoc)
 	setListeners(syncedDoc, changeListener, peerConnectedListener, peerDisconnectedListener)
 
@@ -97,12 +99,13 @@ func New(changeListener ChangeListener,
 }
 
 // Open downloads a document having the specified ID
-func Open(docId string, changeListener ChangeListener,
+func Open(docId string, syncManager network.Manager, changeListener ChangeListener,
 	peerConnectedListener PeerConnectedListener,
 	peerDisconnectedListener PeerDisconnectedListener) (Document, error) {
 
 	syncedDoc := new (SyncedDocument)
 
+	syncedDoc.syncManager = syncManager
 	initDocState(syncedDoc)
 	setListeners(syncedDoc, changeListener, peerConnectedListener, peerDisconnectedListener)
 
@@ -112,7 +115,7 @@ func Open(docId string, changeListener ChangeListener,
 }
 
 // Load deserializes serializedData and creates a document
-func Load(serializedData []byte, changeListener ChangeListener,
+func Load(serializedData []byte, syncManager network.Manager, changeListener ChangeListener,
 	peerConnectedListener PeerConnectedListener,
 	peerDisconnectedListener PeerDisconnectedListener) (Document, error) {
 
@@ -137,6 +140,7 @@ func Load(serializedData []byte, changeListener ChangeListener,
 		return nil, err
 	}
 
+	syncedDoc.syncManager = syncManager
 	initDocState(syncedDoc)
 	setListeners(syncedDoc, changeListener, peerConnectedListener, peerDisconnectedListener)
 
@@ -216,5 +220,5 @@ func (doc *SyncedDocument) Close() {
 }
 
 func (doc *SyncedDocument) ToString() string {
-	return "[Document " + string(doc.id) + "]\n" + doc.localDocument.ToString()
+	return "[Document " + string(doc.id) + "]" + doc.localDocument.ToString()
 }

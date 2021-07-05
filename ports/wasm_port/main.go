@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/ajiku17/CollaborativeTextEditor/core/network"
 	"github.com/ajiku17/CollaborativeTextEditor/core/synceddoc"
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
 	"syscall/js"
@@ -49,7 +50,7 @@ func DocumentOpen(this js.Value, i []js.Value) interface {} {
 	peerConnectedCallback := i[3]
 	peerDisconnectedCallback := i[4]
 
-	doc, err := synceddoc.Open(documentId,
+	doc, err := synceddoc.Open(documentId, network.NewDummyManager(),
 		buildChangeCallback(changeCallback),
 		buildPeerConnectedCallback(peerConnectedCallback),
 		buildPeerDisconnectedCallback(peerDisconnectedCallback))
@@ -75,7 +76,7 @@ func DocumentDeserialize(this js.Value, i []js.Value) interface {} {
 
 	js.CopyBytesToGo(serialized, i[0])
 
-	doc, err := synceddoc.Load(serialized,
+	doc, err := synceddoc.Load(serialized, network.NewDummyManager(),
 		buildChangeCallback(changeCallback),
 		buildPeerConnectedCallback(peerConnectedCallback),
 		buildPeerDisconnectedCallback(peerDisconnectedCallback))
@@ -97,7 +98,7 @@ func DocumentNew(this js.Value, i []js.Value) interface {} {
 	peerConnectedCallback := i[1]
 	peerDisconnectedCallback := i[2]
 
-	doc := synceddoc.New(buildChangeCallback(changeCallback),
+	doc := synceddoc.New(network.NewDummyManager(), buildChangeCallback(changeCallback),
 		buildPeerConnectedCallback(peerConnectedCallback),
 		buildPeerDisconnectedCallback(peerDisconnectedCallback))
 
@@ -229,6 +230,34 @@ func DocumentSetListener(this js.Value, i []js.Value) interface {} {
 	return nil
 }
 
+func DocumentConnect(this js.Value, i []js.Value) interface {} {
+	fd := i[0].Int()
+
+	doc, err := docManager.GetDocument(FileDescriptor(fd))
+
+	if err != nil {
+		return -1
+	}
+
+	doc.Connect()
+
+	return nil
+}
+
+func DocumentDisconnect(this js.Value, i []js.Value) interface {} {
+	fd := i[0].Int()
+
+	doc, err := docManager.GetDocument(FileDescriptor(fd))
+
+	if err != nil {
+		return -1
+	}
+
+	doc.Disconnect()
+
+	return nil
+}
+
 func registerCallbacks() {
 	js.Global().Set("DocumentOpen", js.FuncOf(DocumentOpen))
 	js.Global().Set("DocumentDeserialize", js.FuncOf(DocumentDeserialize))
@@ -239,6 +268,8 @@ func registerCallbacks() {
 	js.Global().Set("DocumentChangeCursor", js.FuncOf(DocumentChangeCursor))
 	js.Global().Set("DocumentSerialize", js.FuncOf(DocumentSerialize))
 	js.Global().Set("DocumentSetListener", js.FuncOf(DocumentSetListener))
+	js.Global().Set("DocumentConnect", js.FuncOf(DocumentConnect))
+	js.Global().Set("DocumentDisconnect", js.FuncOf(DocumentDisconnect))
 }
 
 func main() {

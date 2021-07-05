@@ -67,9 +67,42 @@ function onCursorActivity(editor) {
     DocumentChangeCursor(fd, editor.getDoc().indexFromPos(editor.getCursor()))
 }
 
+function onDocChange(changeName, changeObj) {
+    console.log("received change with name ", changeName, " and change obj ", changeObj)
+    switch (changeObj.changeName) {
+        case "insert":
+            console.log("calling insert")
+            editor.getDoc().replaceRange(changeObj.value,
+                editor.getDoc().posFromIndex(changeObj.index),
+                editor.getDoc().posFromIndex(changeObj.index),
+                "ignore")
+
+            break
+
+        case "delete":
+            editor.getDoc().replaceRange("",
+                editor.getDoc().posFromIndex(changeObj.index),
+                editor.getDoc().posFromIndex(changeObj.index) + 1)
+
+            break
+
+        case "peer_cursor":
+            break
+    }
+
+}
+
+function onPeerConnect(peerId, cursorPos) {
+    console.log("peer ", peerId, " connected with cursor position ", cursorPos)
+}
+
+function onPeerDisconnect(peerId) {
+    console.log("peer ", peerId, " disconnected")
+}
+
 function openNewDoc() {
     editor.setValue("")
-    fd = DocumentNew()
+    fd = DocumentNew(onDocChange, onPeerConnect, onPeerDisconnect)
     documentLoaded()
 }
 
