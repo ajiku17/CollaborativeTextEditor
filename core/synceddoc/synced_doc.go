@@ -1,85 +1,220 @@
 package synceddoc
 
 import (
+	"bytes"
+	"encoding/gob"
+	"fmt"
 	"github.com/ajiku17/CollaborativeTextEditor/core/crdt"
 	"github.com/ajiku17/CollaborativeTextEditor/core/network"
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
+	"sync"
 )
 
 type SyncedDocument struct {
-	id utils.UUID
+	id     utils.UUID
+	siteId utils.UUID
 
-	cursorPosition int
+	cursorPosition      int
+	peerCursorPositions map[utils.UUID] int
 
 	localDocument crdt.Document
 	syncManager   network.Manager
+
+	killed bool
+	mu     sync.Mutex
 }
 
-func (syncedDoc *SyncedDocument) Connect() {
-
+func (doc *SyncedDocument) Connect() {
+	doc.syncManager.Connect()
 }
 
-func (syncedDoc *SyncedDocument) Disconnect() {
+func (doc *SyncedDocument) Disconnect() {
+	doc.syncManager.Disconnect()
+}
 
+func initDocState(doc *SyncedDocument) {
+	doc.siteId = utils.GenerateNewID()
+	doc.cursorPosition = 0
+	doc.peerCursorPositions = make(map[utils.UUID]int)
+	doc.killed = false
+}
+
+func setListeners(doc *SyncedDocument, changeListener ChangeListener,
+	peerConnectedListener PeerConnectedListener,
+	peerDisconnectedListener PeerDisconnectedListener) {
+
+	setChangeListener(doc, changeListener)
+	setPeerConnectedListener(doc, peerConnectedListener)
+	setPeerDisconnectedListener(doc, peerDisconnectedListener)
+}
+
+func setPeerDisconnectedListener(doc *SyncedDocument, listener PeerDisconnectedListener) {
+	doc.syncManager.SetPeerDisconnectedListener(func (peerId utils.UUID, aux interface{}) {
+		listener(peerId)
+	})
+}
+
+func setPeerConnectedListener(doc *SyncedDocument, listener PeerConnectedListener) {
+	doc.syncManager.SetPeerConnectedListener(func (peerId utils.UUID, aux interface{}) {
+		if cursorIndex, ok := aux.(int); ok {
+			listener(peerId, cursorIndex)
+		} else {
+			fmt.Printf("Peer connected listener: received invalid argument of type %T", aux)
+		}
+	})
+}
+
+func setChangeListener(doc *SyncedDocument, listener ChangeListener) {
+	doc.syncManager.SetOnMessageReceiveListener(func (message interface{}) {
+		switch message.(type) {
+		case ChangeCRDTInsert:
+			change := message.(ChangeCRDTInsert)
+			insertIndex := doc.localDocument.InsertAtPosition(change.Position, change.Value)
+
+			listener(CHANGE_INSERT, ChangeInsert {Index: insertIndex, Value: change.Value})
+		case ChangeCRDTDelete:
+			change := message.(ChangeCRDTDelete)
+			deleteIndex := doc.localDocument.DeleteAtPosition(change.Position)
+
+			listener(CHANGE_INSERT, ChangeDelete {Index: deleteIndex})
+		case ChangePeerCursor:
+			listener(CHANGE_PEER_CURSOR, message)
+		}
+	})
 }
 
 // New creates a new, empty document
-func New() Document {
+func New(changeListener ChangeListener,
+	peerConnectedListener PeerConnectedListener,
+	peerDisconnectedListener PeerDisconnectedListener) Document {
+
 	syncedDoc := new (SyncedDocument)
+
+	initDocState(syncedDoc)
+	setListeners(syncedDoc, changeListener, peerConnectedListener, peerDisconnectedListener)
 
 	return syncedDoc
 }
 
 // Open downloads a document having the specified ID
-func Open(docId string) (Document, error) {
+func Open(docId string, changeListener ChangeListener,
+	peerConnectedListener PeerConnectedListener,
+	peerDisconnectedListener PeerDisconnectedListener) (Document, error) {
+
 	syncedDoc := new (SyncedDocument)
+
+	initDocState(syncedDoc)
+	setListeners(syncedDoc, changeListener, peerConnectedListener, peerDisconnectedListener)
+
+	syncedDoc.Connect()
 
 	return syncedDoc, nil
 }
 
 // Load deserializes serializedData and creates a document
-func Load(serializedData []byte) (Document, error) {
+func Load(serializedData []byte, changeListener ChangeListener,
+	peerConnectedListener PeerConnectedListener,
+	peerDisconnectedListener PeerDisconnectedListener) (Document, error) {
+
 	syncedDoc := new (SyncedDocument)
+
+	r := bytes.NewBuffer(serializedData)
+	d := gob.NewDecoder(r)
+
+	err := d.Decode(&syncedDoc.id)
+	if err != nil {
+		return nil, err
+	}
+
+	var documentContent []byte
+	err = d.Decode(&documentContent)
+	if err != nil {
+		return nil, err
+	}
+
+	err = syncedDoc.localDocument.Deserialize(documentContent)
+	if err != nil {
+		return nil, err
+	}
+
+	initDocState(syncedDoc)
+	setListeners(syncedDoc, changeListener, peerConnectedListener, peerDisconnectedListener)
+
+	syncedDoc.Connect()
 
 	return syncedDoc, nil
 }
 
-func (syncedDoc *SyncedDocument) GetID() utils.UUID {
-	return ""
+func (doc *SyncedDocument) GetID() utils.UUID {
+	return doc.id
 }
 
-func (syncedDoc *SyncedDocument) SetChangeListener(listener ChangeListener) {
-
+func (doc *SyncedDocument) SetChangeListener(listener ChangeListener) {
+	setChangeListener(doc, listener)
 }
 
-func (syncedDoc *SyncedDocument) SetPeerConnectedListener(listener PeerConnectedListener) {
-
+func (doc *SyncedDocument) SetPeerConnectedListener(listener PeerConnectedListener) {
+	setPeerConnectedListener(doc, listener)
 }
 
-func (syncedDoc *SyncedDocument) SetPeerDisconnectedListener(listener PeerDisconnectedListener) {
-
+func (doc *SyncedDocument) SetPeerDisconnectedListener(listener PeerDisconnectedListener) {
+	setPeerDisconnectedListener(doc, listener)
 }
 
-func (syncedDoc *SyncedDocument) Serialize() []byte {
-	return []byte{}
+func (doc *SyncedDocument) Serialize() ([]byte, error) {
+	var result []byte
+
+	w := new(bytes.Buffer)
+	e := gob.NewEncoder(w)
+
+	err := e.Encode(doc.id)
+	if err != nil {
+		return nil, err
+	}
+
+	documentContent, err := doc.localDocument.Serialize()
+	if err != nil {
+		return nil, err
+	}
+
+	result = append(result, w.Bytes()...)
+	result = append(result, documentContent...)
+
+	return result, nil
 }
 
-func (syncedDoc *SyncedDocument) InsertAtIndex(index int, val string) {
+func (doc *SyncedDocument) InsertAtIndex(index int, val string) {
+	doc.mu.Lock()
+	defer doc.mu.Unlock()
 
+	pos := doc.localDocument.InsertAtIndex(val, index)
+
+	doc.syncManager.BroadcastMessage(ChangeCRDTInsert {Position: pos, Value: val})
 }
 
-func (syncedDoc *SyncedDocument) DeleteAtIndex(index int) {
+func (doc *SyncedDocument) DeleteAtIndex(index int) {
+	doc.mu.Lock()
+	defer doc.mu.Unlock()
 
+	pos := doc.localDocument.DeleteAtIndex(index)
+
+	doc.syncManager.BroadcastMessage(ChangeCRDTDelete{Position: pos})
 }
 
-func (syncedDoc *SyncedDocument) SetCursor(index int) {
-
+func (doc *SyncedDocument) SetCursor(index int) {
+	doc.cursorPosition = index
 }
 
-func (syncedDoc *SyncedDocument) Close() {
+func (doc *SyncedDocument) Close() {
+	doc.mu.Lock()
+	defer doc.mu.Unlock()
 
+	doc.killed = true
+
+	// free resources
+	doc.localDocument = nil
 }
 
-func (syncedDoc *SyncedDocument) ToString() string {
-	return ""
+func (doc *SyncedDocument) ToString() string {
+	return "[Document " + string(doc.id) + "]\n" + doc.localDocument.ToString()
 }

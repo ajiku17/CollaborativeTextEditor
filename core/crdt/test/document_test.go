@@ -10,13 +10,13 @@ import (
 
 func InsertAtTop(doc crdt.Document, text string) {
 	for _, character := range text {
-		doc.InsertAtIndex(string(character), 0, utils.RandBetween(1, 5))
+		doc.InsertAtIndex(string(character), 0)
 	}
 }
 
 func InsertAtBottom(doc crdt.Document, text string) {
 	for index, character := range text {
-		doc.InsertAtIndex(string(character), index, utils.RandBetween(1, 5))
+		doc.InsertAtIndex(string(character), index)
 	}
 }
 
@@ -41,12 +41,12 @@ func DocumentInsertAtIndex(t *testing.T, newDocumentInstance func () crdt.Docume
 	// #3
 	document = newDocumentInstance()
 
-	document.InsertAtIndex("e", 0, 1)
-	document.InsertAtIndex("l", 1, 4)
-	document.InsertAtIndex("o", 2, 3)
-	document.InsertAtIndex("l", 1, 1)
-	document.InsertAtIndex("!", 4, 2)
-	document.InsertAtIndex("H", 0, 4)
+	document.InsertAtIndex("e", 0)
+	document.InsertAtIndex("l", 1)
+	document.InsertAtIndex("o", 2)
+	document.InsertAtIndex("l", 1)
+	document.InsertAtIndex("!", 4)
+	document.InsertAtIndex("H", 0)
 	AssertTrue(t, document.Length() == 6)
 	AssertTrue(t, document.ToString() == "Hello!")
 }
@@ -66,29 +66,29 @@ func DocumentDeleteAtIndex(t *testing.T, newDocumentInstance func () crdt.Docume
 	AssertTrue(t, document.Length() == 10)
 	AssertTrue(t, document.ToString() == " everyone!")
 
-	document.InsertAtIndex("H", 0, 4)
-	document.InsertAtIndex("e", 1, 1)
-	document.InsertAtIndex("l", 2, 4)
-	document.InsertAtIndex("l", 3, 1)
-	document.InsertAtIndex("o", 4, 1)
+	document.InsertAtIndex("H", 0)
+	document.InsertAtIndex("e", 1)
+	document.InsertAtIndex("l", 2)
+	document.InsertAtIndex("l", 3)
+	document.InsertAtIndex("o", 4)
 	AssertTrue(t, document.Length() == 15)
 	AssertTrue(t, document.ToString() == "Hello everyone!")
 
 	// #2
 	document = newDocumentInstance()
 
-	document.InsertAtIndex("H", 0, 1)
-	document.InsertAtIndex("i", 1, 4)
-	document.InsertAtIndex(" ", 2, 1)
-	document.InsertAtIndex("e", 3, 4)
-	document.InsertAtIndex("v", 4, 1)
-	document.InsertAtIndex("e", 5, 4)
-	document.InsertAtIndex("r", 6, 1)
-	document.InsertAtIndex("y", 7, 4)
-	document.InsertAtIndex("o", 8, 1)
-	document.InsertAtIndex("n", 9, 4)
-	document.InsertAtIndex("e", 10, 1)
-	document.InsertAtIndex("!", 11, 1)
+	document.InsertAtIndex("H", 0)
+	document.InsertAtIndex("i", 1)
+	document.InsertAtIndex(" ", 2)
+	document.InsertAtIndex("e", 3)
+	document.InsertAtIndex("v", 4)
+	document.InsertAtIndex("e", 5)
+	document.InsertAtIndex("r", 6)
+	document.InsertAtIndex("y", 7)
+	document.InsertAtIndex("o", 8)
+	document.InsertAtIndex("n", 9)
+	document.InsertAtIndex("e", 10)
+	document.InsertAtIndex("!", 11)
 	AssertTrue(t, document.Length() == 12)
 	AssertTrue(t, document.ToString() == "Hi everyone!")
 
@@ -103,11 +103,11 @@ func DocumentDeleteAtIndex(t *testing.T, newDocumentInstance func () crdt.Docume
 	AssertTrue(t, document.Length() == 4)
 	AssertTrue(t, document.ToString() == "Hi !")
 
-	document.InsertAtIndex("f", 3, 4)
-	document.InsertAtIndex("o", 4, 1)
-	document.InsertAtIndex("l", 5, 4)
-	document.InsertAtIndex("k", 6, 1)
-	document.InsertAtIndex("s", 7, 1)
+	document.InsertAtIndex("f", 3)
+	document.InsertAtIndex("o", 4)
+	document.InsertAtIndex("l", 5)
+	document.InsertAtIndex("k", 6)
+	document.InsertAtIndex("s", 7)
 	AssertTrue(t, document.Length() == 9)
 	AssertTrue(t, document.ToString() == "Hi folks!")
 }
@@ -126,7 +126,7 @@ func DocInsertAtPosition(t *testing.T, newDocumentInstance func () crdt.Document
 	}{}
 
 	for _, c := range text {
-		pos := manager.AllocPositionBetween(prev, next, utils.RandBetween(1, 5))
+		pos := manager.AllocPositionBetween(prev, next)
 		positions = append(positions, struct {
 			pos crdt.Position
 			val string
@@ -175,7 +175,7 @@ func DocDeleteAtPos(t *testing.T, newDocumentInstance func () crdt.Document, new
 	}{}
 
 	for _, c := range text {
-		pos := manager.AllocPositionBetween(prev, next, utils.RandBetween(1, 5))
+		pos := manager.AllocPositionBetween(prev, next)
 		positions = append(positions, struct {
 			pos crdt.Position
 			val string
@@ -208,19 +208,18 @@ func DocDeleteAtPos(t *testing.T, newDocumentInstance func () crdt.Document, new
 
 func DocSerializeDeserialize(t *testing.T, newDocumentInstance func () crdt.Document) {
 	document := newDocumentInstance()
-	siteID := utils.RandBetween(1, 5)
 
-	document.InsertAtIndex("H", 0, siteID)
-	document.InsertAtIndex("e", 1, siteID)
-	document.InsertAtIndex("l", 2, siteID)
-	document.InsertAtIndex("l", 3, siteID)
-	document.InsertAtIndex("o", 4, siteID)
-	document.InsertAtIndex(" ", 5, siteID)
-	document.InsertAtIndex("W", 6, siteID)
-	document.InsertAtIndex("o", 7, siteID)
-	document.InsertAtIndex("r", 8, siteID)
-	document.InsertAtIndex("l", 9, siteID)
-	document.InsertAtIndex("d", 10, siteID)
+	document.InsertAtIndex("H", 0)
+	document.InsertAtIndex("e", 1)
+	document.InsertAtIndex("l", 2)
+	document.InsertAtIndex("l", 3)
+	document.InsertAtIndex("o", 4)
+	document.InsertAtIndex(" ", 5)
+	document.InsertAtIndex("W", 6)
+	document.InsertAtIndex("o", 7)
+	document.InsertAtIndex("r", 8)
+	document.InsertAtIndex("l", 9)
+	document.InsertAtIndex("d", 10)
 
 	serialized, err := document.Serialize()
 	AssertTrue(t, err == nil)
@@ -234,7 +233,7 @@ func DocSerializeDeserialize(t *testing.T, newDocumentInstance func () crdt.Docu
 	AssertTrue(t, deserializedDoc.Length() == document.Length())
 	AssertTrue(t, deserializedDoc.ToString() == document.ToString())
 
-	deserializedDoc.InsertAtIndex("!", 11, siteID)
+	deserializedDoc.InsertAtIndex("!", 11)
 	AssertTrue(t, deserializedDoc.ToString() == "Hello World!")
 }
 
@@ -248,10 +247,10 @@ func TestDocument(t *testing.T) {
 	} {
 		{ 
 			func() crdt.Document {
-				return crdt.NewBasicDocument(crdt.NewBasicPositionManager())
+				return crdt.NewBasicDocument(crdt.NewBasicPositionManager("1"))
 			},
 			func() crdt.PositionManager {
-				return crdt.NewBasicPositionManager()
+				return crdt.NewBasicPositionManager("1")
 			},
 			"BasicDocument",
 		},

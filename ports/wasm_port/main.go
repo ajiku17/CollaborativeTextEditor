@@ -9,11 +9,50 @@ import (
 
 var docManager *DocumentManager
 
+func buildChangeCallback(changeCallback js.Value) synceddoc.ChangeListener {
+	return func (changeName string, change interface {}) {
+		changeObj := make(map[string]interface{})
+
+		changeObj["changeName"] = changeName
+
+		switch change.(type) {
+		case synceddoc.ChangeInsert:
+			changeObj["index"] = change.(synceddoc.ChangeInsert).Index
+			changeObj["value"] = change.(synceddoc.ChangeInsert).Value
+		case synceddoc.ChangeDelete:
+			changeObj["index"] = change.(synceddoc.ChangeDelete).Index
+		case synceddoc.ChangePeerCursor:
+			changeObj["peerId"] = change.(synceddoc.ChangePeerCursor).PeerID
+			changeObj["cursorPos"] = change.(synceddoc.ChangePeerCursor).CursorPosition
+		}
+
+		changeCallback.Invoke(changeName, changeObj)
+	}
+}
+
+func buildPeerConnectedCallback(peerConnectedCallback js.Value) synceddoc.PeerConnectedListener {
+	return func (peerId utils.UUID, cursorPosition int) {
+		peerConnectedCallback.Invoke(string(peerId), cursorPosition)
+	}
+}
+
+func buildPeerDisconnectedCallback(peerDisconnectedCallback js.Value) synceddoc.PeerDisconnectedListener {
+	return func (peerId utils.UUID) {
+		peerDisconnectedCallback.Invoke(string(peerId))
+	}
+}
+
 func DocumentOpen(this js.Value, i []js.Value) interface {} {
 	documentId := i[0].String()
 	initCallback := i[1]
+	changeCallback := i[2]
+	peerConnectedCallback := i[3]
+	peerDisconnectedCallback := i[4]
 
-	doc, err := synceddoc.Open(documentId)
+	doc, err := synceddoc.Open(documentId,
+		buildChangeCallback(changeCallback),
+		buildPeerConnectedCallback(peerConnectedCallback),
+		buildPeerDisconnectedCallback(peerDisconnectedCallback))
 	if err != nil {
 		fmt.Println("error: ", err)
 		return nil
@@ -28,12 +67,18 @@ func DocumentOpen(this js.Value, i []js.Value) interface {} {
 func DocumentDeserialize(this js.Value, i []js.Value) interface {} {
 	byteArray := i[0]
 	initCallback := i[1]
+	changeCallback := i[2]
+	peerConnectedCallback := i[3]
+	peerDisconnectedCallback := i[4]
 
 	serialized := make([]byte, byteArray.Get("length").Int())
 
 	js.CopyBytesToGo(serialized, i[0])
 
-	doc, err := synceddoc.Load(serialized)
+	doc, err := synceddoc.Load(serialized,
+		buildChangeCallback(changeCallback),
+		buildPeerConnectedCallback(peerConnectedCallback),
+		buildPeerDisconnectedCallback(peerDisconnectedCallback))
 	if err != nil {
 		fmt.Println("error: ", err)
 		return nil
@@ -48,7 +93,13 @@ func DocumentDeserialize(this js.Value, i []js.Value) interface {} {
 }
 
 func DocumentNew(this js.Value, i []js.Value) interface {} {
-	doc := synceddoc.New()
+	changeCallback := i[0]
+	peerConnectedCallback := i[1]
+	peerDisconnectedCallback := i[2]
+
+	doc := synceddoc.New(buildChangeCallback(changeCallback),
+		buildPeerConnectedCallback(peerConnectedCallback),
+		buildPeerDisconnectedCallback(peerDisconnectedCallback))
 
 	fd := docManager.PutDocument(doc)
 
@@ -132,7 +183,10 @@ func DocumentSerialize(this js.Value, i []js.Value) interface {} {
 		return []interface{}{-1}
 	}
 
-	serialized := doc.Serialize()
+	serialized, err := doc.Serialize()
+	if err != nil {
+		return -1
+	}
 
 	res := make([]interface{}, len(serialized))
 
@@ -144,36 +198,15 @@ func DocumentSerialize(this js.Value, i []js.Value) interface {} {
 }
 
 func SetChangeListener(doc synceddoc.Document, callback js.Value) {
-	doc.SetChangeListener(func (changeName string, change interface {}) {
-		changeObj := make(map[string]interface{})
-
-		changeObj["changeName"] = changeName
-
-		switch change.(type) {
-		case synceddoc.ChangeInsert:
-			changeObj["index"] = change.(synceddoc.ChangeInsert).Index
-			changeObj["value"] = change.(synceddoc.ChangeInsert).Value
-		case synceddoc.ChangeDelete:
-			changeObj["index"] = change.(synceddoc.ChangeDelete).Index
-		case synceddoc.ChangePeerCursor:
-			changeObj["peerId"] = change.(synceddoc.ChangePeerCursor).PeerID
-			changeObj["cursorPos"] = change.(synceddoc.ChangePeerCursor).CursorPosition
-		}
-
-		callback.Invoke(changeName, changeObj)
-	})
+	doc.SetChangeListener(buildChangeCallback(callback))
 }
 
 func SetPeerConnectedListener(doc synceddoc.Document, callback js.Value) {
-	doc.SetPeerConnectedListener(func (peerId utils.UUID, cursorPosition int) {
-		callback.Invoke(string(peerId), cursorPosition)
-	})
+	doc.SetPeerConnectedListener(buildPeerConnectedCallback(callback))
 }
 
 func SetPeerDisconnectedListener(doc synceddoc.Document, callback js.Value) {
-	doc.SetPeerDisconnectedListener(func (peerId utils.UUID) {
-		callback.Invoke(string(peerId))
-	})
+	doc.SetPeerDisconnectedListener(buildPeerDisconnectedCallback(callback))
 }
 
 func DocumentSetListener(this js.Value, i []js.Value) interface {} {

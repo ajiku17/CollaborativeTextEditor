@@ -32,7 +32,7 @@ func (doc *BasicDocument) Length() int {
 	return len(doc.Elems) - 2
 }
 
-func (doc *BasicDocument) InsertAtIndex(val string, index, site int) Position {
+func (doc *BasicDocument) InsertAtIndex(val string, index int) Position {
 	if index < 0 || index > len(doc.Elems) - 2 {
 		log.Fatalf("Document: invalid insert index %v", index)
 	}
@@ -43,18 +43,18 @@ func (doc *BasicDocument) InsertAtIndex(val string, index, site int) Position {
 
 	prevPos := (doc.Elems[index]).Position
 	afterPos := (doc.Elems[index + 1]).Position
-	position := doc.PositionManager.AllocPositionBetween(prevPos, afterPos, site)
+	position := doc.PositionManager.AllocPositionBetween(prevPos, afterPos)
 	doc.DocInsert(index + 1, Element{val, position})
 
 	return position
 }
 
-func (doc *BasicDocument) DeleteAtIndex(index int) {
+func (doc *BasicDocument) DeleteAtIndex(index int) Position {
 	if index < 0 || index > len(doc.Elems) - 2 {
 		log.Fatalf("Document: invalid delete index %v", index)
 	}
 
-	doc.DocDelete(index + 1)
+	return doc.DocDelete(index + 1)
 }
 
 func (doc *BasicDocument) ToString() string {
@@ -95,7 +95,7 @@ func (doc *BasicDocument) DocDelete(index int) Position {
 	return removedPos
 }
 
-func (doc *BasicDocument) InsertAtPosition(pos Position, val string) {
+func (doc *BasicDocument) InsertAtPosition(pos Position, val string) int {
 	var index int
 	var copyDoc []Element
 
@@ -112,9 +112,11 @@ func (doc *BasicDocument) InsertAtPosition(pos Position, val string) {
 	copyDoc = append(copyDoc, doc.Elems[index + 1:]...)
 	
 	doc.Elems = copyDoc[:]
+
+	return index
 }
 
-func (doc *BasicDocument) DeleteAtPosition (pos Position) {
+func (doc *BasicDocument) DeleteAtPosition (pos Position) int {
 	var index int
 	var copyDoc []Element
 
@@ -129,6 +131,8 @@ func (doc *BasicDocument) DeleteAtPosition (pos Position) {
 	copyDoc = append(copyDoc, doc.Elems[index + 1:]...)
 
 	doc.Elems = copyDoc[:]
+
+	return index
 }
 
 func (doc *BasicDocument) Serialize() ([]byte, error) {

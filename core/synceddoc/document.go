@@ -39,7 +39,7 @@ type Document interface {
 	/*
 	 * Returns the contents of this document serialized into a byte array
 	 */
-	Serialize() []byte
+	Serialize() ([]byte, error)
 
 	/*
 	 * Document modifications
