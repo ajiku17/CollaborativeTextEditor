@@ -1,6 +1,10 @@
 package synceddoc
 
 import (
+	"fmt"
+	"strconv"
+	"time"
+
 	"github.com/ajiku17/CollaborativeTextEditor/core/crdt"
 	"github.com/ajiku17/CollaborativeTextEditor/core/network"
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
@@ -11,12 +15,13 @@ type SyncedDocument struct {
 
 	cursorPosition int
 
-	localDocument crdt.Document
-	syncManager   network.Manager
+	LocalDocument crdt.Document
+	syncManager network.Manager
 }
 
 func (syncedDoc *SyncedDocument) Connect() {
-	panic("implement me")
+	// TODO: synchronizes changes
+	syncedDoc.syncManager.Connect()
 }
 
 func (syncedDoc *SyncedDocument) Disconnect() {
@@ -25,9 +30,9 @@ func (syncedDoc *SyncedDocument) Disconnect() {
 
 // New creates a new, empty document
 func New() Document {
-	syncedDoc := new (SyncedDocument)
-
-	return syncedDoc
+	id := utils.GenerateNewID()
+	syncedDoc := SyncedDocument{id, 0, crdt.NewBasicDocument(crdt.NewBasicPositionManager()), &network.DocumentManager{Id:id}}
+	return &syncedDoc
 }
 
 // Open downloads a document having the specified ID
@@ -40,16 +45,44 @@ func Open(docId string) Document {
 // Load deserializes serializedData and creates a document
 func Load(serializedData []byte) Document {
 	syncedDoc := new (SyncedDocument)
-
+	syncedDoc.LocalDocument.Deserialize(serializedData)
 	return syncedDoc
 }
 
 func (syncedDoc *SyncedDocument) GetID() utils.UUID {
-	return ""
+	return syncedDoc.id
+}
+
+func onMessageReceive(message interface{}) {
+	notify := message.(network.ToNotify)
+	notify.ToNotifyDocuments <- notify.AddCurrent
 }
 
 func (syncedDoc *SyncedDocument) SetChangeListener(listener ChangeListener) {
+	go syncedDoc.syncManager.SetOnMessageReceiveListener(onMessageReceive)
 
+	notified := make(map[utils.PackedDocument]struct{})
+	for { 	
+		packedDocument := <- syncedDoc.syncManager.(*network.DocumentManager).ToNotify.ToNotifyDocuments
+		if packedDocument != nil {
+			if _, ok := notified[*packedDocument]; ok {
+				continue
+			}
+			notified[*packedDocument] = struct{}{}
+			index, _ := strconv.Atoi(packedDocument.Index)
+			// id, _ := strconv.Atoi(string(syncedDoc.id))
+			if packedDocument.Action == CHANGE_INSERT {
+				// syncedDoc.LocalDocument.InsertAtIndex(packedDocument.Value, index, id)
+				syncedDoc.LocalDocument.InsertAtPosition(crdt.ToBasicPosition(packedDocument.Position), packedDocument.Value)
+				// listener(CHANGE_INSERT, packedDocument)
+			} else if packedDocument.Action == CHANGE_DELETE {
+				syncedDoc.LocalDocument.DeleteAtIndex(index)
+				// listener(CHANGE_DELETE, packedDocument)
+			}
+			
+			time.Sleep(time.Second)
+		}
+	}
 }
 
 func (syncedDoc *SyncedDocument) SetPeerConnectedListener(listener PeerConnectedListener) {
@@ -61,19 +94,27 @@ func (syncedDoc *SyncedDocument) SetPeerDisconnectedListener(listener PeerDiscon
 }
 
 func (syncedDoc *SyncedDocument) Serialize() []byte {
-	return []byte{}
+	res, err := syncedDoc.LocalDocument.Serialize()
+	if err != nil {
+		fmt.Printf("Error while serializing data: %s", err)
+	}
+	return res
 }
 
 func (syncedDoc *SyncedDocument) InsertAtIndex(index int, val string) {
-
+	id, _ := strconv.Atoi(string(syncedDoc.id))
+	position := syncedDoc.LocalDocument.InsertAtIndex(val, index, id)
+	syncedDoc.syncManager.BroadcastMessage(utils.PackedDocument{string(syncedDoc.id), strconv.Itoa(index), crdt.BasicPositionToString(position.(crdt.BasicPosition)), val, CHANGE_INSERT})
 }
 
 func (syncedDoc *SyncedDocument) DeleteAtIndex(index int) {
-
+	syncedDoc.LocalDocument.DeleteAtIndex(index)
+	syncedDoc.syncManager.BroadcastMessage(utils.PackedDocument{string(syncedDoc.id), strconv.Itoa(index), "", "", CHANGE_DELETE})
 }
 
 func (syncedDoc *SyncedDocument) SetCursor(index int) {
-
+	syncedDoc.cursorPosition = index
+	syncedDoc.syncManager.BroadcastMessage(utils.PackedDocument{string(syncedDoc.id), strconv.Itoa(index), "", "", CHANGE_PEER_CURSOR})
 }
 
 func (syncedDoc *SyncedDocument) Close() {
