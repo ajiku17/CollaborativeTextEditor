@@ -1,6 +1,7 @@
 package synceddoc
 
 import (
+	"github.com/ajiku17/CollaborativeTextEditor/core/crdt"
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
 )
 
@@ -13,8 +14,17 @@ type ChangeInsert struct {
 	Index int
 }
 
+type ChangeCRDTInsert struct {
+	Value    string
+	Position crdt.Position
+}
+
 type ChangeDelete struct {
 	Index int
+}
+
+type ChangeCRDTDelete struct {
+	Position crdt.Position
 }
 
 type ChangePeerCursor struct {

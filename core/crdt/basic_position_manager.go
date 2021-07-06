@@ -16,31 +16,33 @@ const base = math.MaxInt32
 
 type Identifier struct {
 	Pos  int
-	Site int
+	Site utils.UUID
 }
 
 type BasicPositionManager struct {
-	Base int
+	SiteID utils.UUID
+	Base   int
 }
 
 type BasicPosition []Identifier
 
-func NewBasicPositionManager() *BasicPositionManager {
+func NewBasicPositionManager(siteId utils.UUID) *BasicPositionManager {
 	gob.Register(BasicPosition{})
 
 	manager := new(BasicPositionManager)
 	manager.Base = base
+	manager.SiteID = siteId
 	NumberSetBase(manager.Base)
 
 	return manager
 }
 
 func (manager *BasicPositionManager) GetMaxPosition() Position {
-	return BasicPosition{Identifier{manager.Base, 0}}
+	return BasicPosition{Identifier{manager.Base, manager.SiteID}}
 }
 
 func (manager *BasicPositionManager) GetMinPosition() Position {
-	return BasicPosition{Identifier{0, 0}}
+	return BasicPosition{Identifier{0, manager.SiteID}}
 }
 
 func PositionToNumber(pos BasicPosition) Number {
@@ -158,11 +160,11 @@ func Prefix(position BasicPosition, index int) Number {
 	return numberCopy
 }
 
-func ConstructPosition(r Number, prevPos, afterPos BasicPosition, site int) BasicPosition {
+func ConstructPosition(r Number, prevPos, afterPos BasicPosition, site utils.UUID) BasicPosition {
 	var res BasicPosition
 
 	for i, digit := range r {
-		var s int
+		var s utils.UUID
 		
 		if i == len(r) - 1 {
 			s = site
@@ -180,7 +182,7 @@ func ConstructPosition(r Number, prevPos, afterPos BasicPosition, site int) Basi
 	return res
 }
 
-func (manager *BasicPositionManager) AllocPositionBetween(prevPos, afterPos Position, site int) Position {
+func (manager *BasicPositionManager) AllocPositionBetween(prevPos, afterPos Position) Position {
 	prevBasicPos, ok1 := prevPos.(BasicPosition)
 	afterBasicPos, ok2 := afterPos.(BasicPosition)
 	if ok1 && ok2 {
@@ -193,7 +195,7 @@ func (manager *BasicPositionManager) AllocPositionBetween(prevPos, afterPos Posi
 		step := utils.Min(BASE, interval)
 
 		r := Prefix(prevBasicPos, index)
-		position := ConstructPosition(NumberAdd(r, Number{utils.RandBetween(0, step) + 1}), prevBasicPos, afterBasicPos, site)
+		position := ConstructPosition(NumberAdd(r, Number{utils.RandBetween(0, step) + 1}), prevBasicPos, afterBasicPos, manager.SiteID)
 
 		return position
 	} else {
@@ -212,7 +214,7 @@ func ToBasicPosition(position string) Position  {
 			position = position[strings.Index(position, ",") + 1:]
 			site, _ := strconv.Atoi(position[:strings.Index(position, ")")])
 			position = position[strings.Index(position, ")"):]
-			identifier := Identifier{pos, site}
+			identifier := Identifier{pos, utils.UUID(site)}
 			*result_position = append(*result_position, identifier)
 			position = position[1:]
 		} else {

@@ -42,7 +42,7 @@ func BenchmarkDocument(b *testing.B) {
 	} {
 		{ 
 			func() crdt.Document {
-				return crdt.NewBasicDocument(crdt.NewBasicPositionManager())
+				return crdt.NewBasicDocument(crdt.NewBasicPositionManager("1"))
 			},
 			"BasicDocument",
 		},

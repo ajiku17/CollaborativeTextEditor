@@ -1,10 +1,10 @@
 package crdt
 
 type Document interface {
-	InsertAtIndex(string, int, int) Position
-	DeleteAtIndex(int)
-	InsertAtPosition(Position, string)
-	DeleteAtPosition(Position)
+	InsertAtIndex(string, int) Position
+	DeleteAtIndex(int) Position
+	InsertAtPosition(Position, string) int
+	DeleteAtPosition(Position) int
 	Serialize() ([]byte, error)
 	Deserialize([]byte) error
 	ToString() string

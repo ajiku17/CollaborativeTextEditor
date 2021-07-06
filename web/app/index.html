@@ -1,0 +1,57 @@
+<!doctype html>
+
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<title>Collaborative Text Editor</title>
+</head>
+
+<body>
+	<!--
+	Add the following polyfill for Microsoft Edge 17/18 support:
+	<script src="https://cdn.jsdelivr.net/npm/text-encoding@0.7.0/lib/encoding.min.js"></script>
+	(see https://caniuse.com/#feat=textencoder)
+	-->
+	<script src="js/wasm_exec.js"></script>
+	<script>
+		if (!WebAssembly.instantiateStreaming) { // polyfill
+			WebAssembly.instantiateStreaming = async (resp, importObject) => {
+				const source = await (await resp).arrayBuffer();
+				return await WebAssembly.instantiate(source, importObject);
+			};
+		}
+
+		const WASM_URL = 'lib/lib.wasm'
+		const go = new Go();
+		let mod, inst;
+
+		WebAssembly.instantiateStreaming(fetch(WASM_URL), go.importObject).then(async (result) => {
+			mod = result.module;
+			inst = result.instance;
+			await go.run(inst);
+		}).catch((err) => {
+			console.error(err);
+		});
+
+	</script>
+
+	<link rel="stylesheet" href="css/codemirror.css">
+	<script src="lib/codemirror.js"></script>
+
+	<div>
+		<button type="button" onclick="openNewDoc()">New</button>
+		<input type="file" id="inputElement">
+		<button type="button" onclick="saveLocal()">Save</button>
+		<button type="button" onclick="closeDoc()">Close</button>
+	</div>
+
+	<br>
+
+	<label for="collaborative-text-editor"></label>
+	<textarea id="collaborative-text-editor" name="text-editor" rows="4" cols="50"></textarea>
+	<script src="js/editor.js"></script>
+
+</body>
+
+</html>

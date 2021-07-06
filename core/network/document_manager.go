@@ -18,6 +18,13 @@ type DocumentManager struct {
 	ToNotify ToNotify
 }
 
+func NewDocumentManager() Manager {
+	manager := new (DocumentManager)
+	manager.Id = utils.GenerateNewID()
+	manager.ToNotify = ToNotify{make(chan(*utils.PackedDocument)), nil}
+	return manager
+}
+
 func (manager *DocumentManager) SetOnMessageReceiveListener(listener MessageReceiveListener)   {
 	socket := manager.socket
 	for {
