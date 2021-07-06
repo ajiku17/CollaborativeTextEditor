@@ -15,7 +15,7 @@
 # vendor/
 
 # Executable
-main
+main/main
 
 # IDE
 .idea

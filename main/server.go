@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -11,6 +10,7 @@ import (
 
 type Server struct {
 	ConnectedSockets map[net.Conn]string
+	Changes []utils.PackedDocument
 	lock             *sync.Mutex
 }
 
@@ -20,6 +20,7 @@ func NewServer() *Server {
 	if server == nil {
 		server = &Server{}
 		server.ConnectedSockets = make(map[net.Conn]string)
+		server.Changes = make([]utils.PackedDocument, 0)
 		server.lock = &sync.Mutex{}
 	}
 	go server.Listen()
@@ -29,7 +30,7 @@ func NewServer() *Server {
 func (server *Server) Listen() {
 	listener, err := net.Listen("tcp", "localhost:8081")
 	if err != nil {
-		// fmt.Println(err)
+		// log.Fatalln(err)
 		return
 	}
 	defer listener.Close()
@@ -37,7 +38,7 @@ func (server *Server) Listen() {
 	for {
 		socket, err := listener.Accept()
 		if err != nil {
-			// fmt.Println(err)
+			// log.Fatalln(err)
 			return
 		}
 		socket.SetDeadline(time.Now().Add(time.Second))
@@ -46,12 +47,9 @@ func (server *Server) Listen() {
 }
 
 func (server *Server) sendAll(data utils.PackedDocument) {
-	// Send request to all clients
 	server.lock.Lock()
 	for socket, site := range server.ConnectedSockets {
-		// fmt.Printf("trying to send(range %d), curr site - %d, foreach site - %d, value - %s\n", len(server.ConnectedSockets), data.Site, site, data.Value)
 		if site != data.Site {
-			fmt.Printf("Server Send %s into %s\n", utils.ToBytes(data), site)
 			socket.Write(utils.ToBytes(data))
 		}
 	}
@@ -67,21 +65,26 @@ func (server *Server) HandleRequest(socket net.Conn) {
 			continue
 		}
 
-		// fmt.Printf("Server received %s\n", receivedMessage)
 		for _, data := range utils.GetPackedDocuments(receivedMessage) {
-			// fmt.Printf("Server received as packedDocument %s\n", data)
 			if data.Action == "connect" {
 				server.setSocketSite(data.Site, socket)
+				go server.syncNewConnection()
 			} else {
+				server.Changes = append(server.Changes, data)
 				go server.sendAll(data)
 			}
 		}
 	}
 }
 
+func (server *Server)syncNewConnection() {
+	for _, packedDocument := range server.Changes {
+		go server.sendAll(packedDocument)
+	}
+}
+
 func (server *Server) setSocketSite(site string, socket net.Conn) {
 	server.ConnectedSockets[socket] = site
-	// fmt.Printf("Connected clients  - %s ; size - %d\n", server.ConnectedSockets, len(server.ConnectedSockets))
 }
 
 func (server *Server) IsConnected(site string) bool {

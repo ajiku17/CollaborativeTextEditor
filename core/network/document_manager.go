@@ -20,7 +20,6 @@ type DocumentManager struct {
 
 func (manager *DocumentManager) SetOnMessageReceiveListener(listener MessageReceiveListener)   {
 	socket := manager.socket
-	// fmt.Printf("Listening to %s\n", socket)
 	for {
 		received := make([]byte, 1024)
 		_, err := socket.Read(received)
@@ -29,9 +28,7 @@ func (manager *DocumentManager) SetOnMessageReceiveListener(listener MessageRece
 			continue
 		}
 
-		// fmt.Printf("Listener Received %s\n", received)
 		for _, data := range utils.GetPackedDocuments(received) {
-			// manager.toNotify <- &data
 			manager.ToNotify.AddCurrent = &data
 			listener(manager.ToNotify)
 		}
@@ -40,11 +37,13 @@ func (manager *DocumentManager) SetOnMessageReceiveListener(listener MessageRece
 
 func (manager *DocumentManager) SetPeerConnectedListener(listener PeerConnectedListener) {
 }
+
 func (manager *DocumentManager) SetPeerDisconnectedListener(listener PeerDisconnectedListener) {
 }
 
 func (manager *DocumentManager) BroadcastMessage(message interface{}) {
-	bytes := utils.ToBytes(message.(utils.PackedDocument))
+	packedDocument := message.(utils.PackedDocument)
+	bytes := utils.ToBytes(packedDocument)
 	sendRequest(manager.socket, bytes)
 }
 
@@ -73,10 +72,9 @@ func (manager *DocumentManager) Connect() {
 		socket.SetDeadline(time.Now().Add(time.Second))
 		manager.socket = socket
 		manager.ToNotify = ToNotify{make(chan(*utils.PackedDocument)), nil}
-		// go manager.AddListener()
 		bytes := utils.ToBytes(utils.PackedDocument{string(manager.Id), "", "", "", "connect"})
-		sendRequest(manager.socket, bytes)
-		return
+		go sendRequest(manager.socket, bytes)
+		return 
 	}
 }
 

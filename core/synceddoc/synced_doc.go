@@ -1,7 +1,7 @@
 package synceddoc
 
 import (
-	"fmt"
+	"log"
 	"strconv"
 	"time"
 
@@ -69,16 +69,7 @@ func (syncedDoc *SyncedDocument) SetChangeListener(listener ChangeListener) {
 				continue
 			}
 			notified[*packedDocument] = struct{}{}
-			index, _ := strconv.Atoi(packedDocument.Index)
-			// id, _ := strconv.Atoi(string(syncedDoc.id))
-			if packedDocument.Action == CHANGE_INSERT {
-				// syncedDoc.LocalDocument.InsertAtIndex(packedDocument.Value, index, id)
-				syncedDoc.LocalDocument.InsertAtPosition(crdt.ToBasicPosition(packedDocument.Position), packedDocument.Value)
-				// listener(CHANGE_INSERT, packedDocument)
-			} else if packedDocument.Action == CHANGE_DELETE {
-				syncedDoc.LocalDocument.DeleteAtIndex(index)
-				// listener(CHANGE_DELETE, packedDocument)
-			}
+			syncedDoc.action(*packedDocument)
 			
 			time.Sleep(time.Second)
 		}
@@ -93,10 +84,19 @@ func (syncedDoc *SyncedDocument) SetPeerDisconnectedListener(listener PeerDiscon
 
 }
 
+func (syncedDoc *SyncedDocument)action(packedDocument utils.PackedDocument) {
+	index, _ := strconv.Atoi(packedDocument.Index)
+	if packedDocument.Action == CHANGE_INSERT {
+		syncedDoc.LocalDocument.InsertAtPosition(crdt.ToBasicPosition(packedDocument.Position), packedDocument.Value)
+	} else if packedDocument.Action == CHANGE_DELETE {
+		syncedDoc.LocalDocument.DeleteAtIndex(index)
+	}
+}
+
 func (syncedDoc *SyncedDocument) Serialize() []byte {
 	res, err := syncedDoc.LocalDocument.Serialize()
 	if err != nil {
-		fmt.Printf("Error while serializing data: %s", err)
+		log.Fatalf("Error while serializing data: %s", err)
 	}
 	return res
 }
