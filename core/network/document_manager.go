@@ -7,25 +7,32 @@ import (
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
 )
 
-type ToNotify struct {
-	ToNotifyDocuments chan *utils.PackedDocument
-	AddCurrent *utils.PackedDocument
-}
-
 type DocumentManager struct {
 	Id utils.UUID
 	socket net.Conn
-	ToNotify ToNotify
+	toSend chan interface{}
+	listeners []interface{}   //[MessageReceiveListener, PeerConnectedListener, PeerDisconnectedListener]
 }
 
-func NewDocumentManager() Manager {
+func NewDocumentManager(id utils.UUID) Manager {
 	manager := new (DocumentManager)
-	manager.Id = utils.GenerateNewID()
-	manager.ToNotify = ToNotify{make(chan(*utils.PackedDocument)), nil}
+	manager.Id = id
+	manager.toSend = make(chan(interface{}))
+	manager.listeners = make([]interface{}, 3)
 	return manager
 }
 
 func (manager *DocumentManager) SetOnMessageReceiveListener(listener MessageReceiveListener)   {
+	manager.listeners[0] = listener
+}
+
+func (manager *DocumentManager) SetPeerConnectedListener(listener PeerConnectedListener) {
+}
+
+func (manager *DocumentManager) SetPeerDisconnectedListener(listener PeerDisconnectedListener) {
+}
+
+func (manager *DocumentManager) messageRecieved() {
 	socket := manager.socket
 	for {
 		received := make([]byte, 1024)
@@ -35,26 +42,26 @@ func (manager *DocumentManager) SetOnMessageReceiveListener(listener MessageRece
 			continue
 		}
 
-		for _, data := range utils.GetPackedDocuments(received) {
-			manager.ToNotify.AddCurrent = &data
-			listener(manager.ToNotify)
+		manager.listeners[0].(MessageReceiveListener)(utils.FromBytes(received))
+	}
+}
+
+func (manager *DocumentManager) BroadcastMessage(message interface{}) {
+	manager.toSend <- message
+}
+
+func (manager *DocumentManager) broadcastMessages() {
+	for {
+		message := <- manager.toSend
+		bytes := utils.ToBytes(message)
+		if bytes != nil {
+			go manager.sendRequest(bytes)
 		}
 	}
 }
 
-func (manager *DocumentManager) SetPeerConnectedListener(listener PeerConnectedListener) {
-}
-
-func (manager *DocumentManager) SetPeerDisconnectedListener(listener PeerDisconnectedListener) {
-}
-
-func (manager *DocumentManager) BroadcastMessage(message interface{}) {
-	packedDocument := message.(utils.PackedDocument)
-	bytes := utils.ToBytes(packedDocument)
-	sendRequest(manager.socket, bytes)
-}
-
-func sendRequest(socket net.Conn, bytes []byte) {
+func (manager *DocumentManager)sendRequest(bytes []byte) {
+	socket := manager.socket
 	for {
 		_, err := socket.Write(bytes)
 		if err != nil {
@@ -78,9 +85,8 @@ func (manager *DocumentManager) Connect() {
 		}
 		socket.SetDeadline(time.Now().Add(time.Second))
 		manager.socket = socket
-		manager.ToNotify = ToNotify{make(chan(*utils.PackedDocument)), nil}
-		bytes := utils.ToBytes(utils.PackedDocument{string(manager.Id), "", "", "", "connect"})
-		go sendRequest(manager.socket, bytes)
+		go manager.messageRecieved()
+		go manager.broadcastMessages()
 		return 
 	}
 }

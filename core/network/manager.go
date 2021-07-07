@@ -8,6 +8,7 @@ type MessageReceiveListener func (message interface{})
 type PeerConnectedListener func (peerId utils.UUID, aux interface{})
 type PeerDisconnectedListener func (peerId utils.UUID, aux interface{})
 
+
 type Manager interface {
 
 	SetOnMessageReceiveListener(listener MessageReceiveListener)
