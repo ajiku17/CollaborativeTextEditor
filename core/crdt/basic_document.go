@@ -11,16 +11,30 @@ type Element struct {
 	Position Position
 }
 
+type OpInsert struct {
+	Pos Position
+	Val string
+}
+
+type OpDelete struct {
+	Pos Position
+}
+
 type BasicDocument struct {
 	Elems           []Element
 	PositionManager PositionManager
+	History         []interface{}
 }
 
 func NewBasicDocument(positionManager PositionManager) *BasicDocument {
+	gob.Register(OpInsert{})
+	gob.Register(OpDelete{})
+
 	doc := new(BasicDocument)
 
 	doc.Elems = []Element{}
 	doc.PositionManager = positionManager
+	doc.History = []interface{}{}
 
 	doc.DocInsert(0, Element{"", doc.PositionManager.GetMaxPosition()})
 	doc.DocInsert(0, Element{"", doc.PositionManager.GetMinPosition()})
@@ -28,118 +42,125 @@ func NewBasicDocument(positionManager PositionManager) *BasicDocument {
 	return doc
 }
 
-func (doc *BasicDocument) Length() int {
-	return len(doc.Elems) - 2
+func (d *BasicDocument) Length() int {
+	return len(d.Elems) - 2
 }
 
-func (doc *BasicDocument) InsertAtIndex(val string, index int) Position {
-	if index < 0 || index > len(doc.Elems) - 2 {
-		log.Fatalf("Document: invalid insert index %v", index)
-	}
-
-	if len(doc.Elems) < 2 {
-		log.Fatal("Document: invalid document")
-	}
-
-	prevPos := (doc.Elems[index]).Position
-	afterPos := (doc.Elems[index + 1]).Position
-	position := doc.PositionManager.AllocPositionBetween(prevPos, afterPos)
-	doc.DocInsert(index + 1, Element{val, position})
-
-	return position
-}
-
-func (doc *BasicDocument) DeleteAtIndex(index int) Position {
-	if index < 0 || index > len(doc.Elems) - 2 {
-		log.Fatalf("Document: invalid delete index %v", index)
-	}
-
-	return doc.DocDelete(index + 1)
-}
-
-func (doc *BasicDocument) ToString() string {
-	res := ""
-	for i := 0; i < len(doc.Elems); i++ {
-		res += doc.Elems[i].Data
-	}
-	return res
-}
-
-func (doc *BasicDocument) DocInsert(index int, elem Element) {
-	if index < 0 || index > len(doc.Elems) {
+func (d *BasicDocument) DocInsert(index int, elem Element) {
+	if index < 0 || index > len(d.Elems) {
 		log.Fatalf("Document: invalid insert index %v", index)
 	}
 
 	var copyElems []Element
 
-	copyElems = append(copyElems, doc.Elems[:index]...)
+	copyElems = append(copyElems, d.Elems[:index]...)
 	copyElems = append(copyElems, elem)
-	copyElems = append(copyElems, doc.Elems[index:]...)
-	
-	doc.Elems = copyElems[:]
+	copyElems = append(copyElems, d.Elems[index:]...)
+
+	d.Elems = copyElems[:]
 }
 
-func (doc *BasicDocument) DocDelete(index int) Position {
-	if index < 0 || index > len(doc.Elems) {
+func (d *BasicDocument) DocDelete(index int) Position {
+	if index < 0 || index > len(d.Elems) {
 		log.Fatalf("Document: invalid insert index %v", index)
 	}
 
 	var copyElems []Element
 
-	copyElems = append(copyElems, doc.Elems[:index]...)
-	copyElems = append(copyElems, doc.Elems[index + 1:]...)
-	removedPos := doc.Elems[index].Position
+	copyElems = append(copyElems, d.Elems[:index]...)
+	copyElems = append(copyElems, d.Elems[index + 1:]...)
+	removedPos := d.Elems[index].Position
 
-	doc.Elems = copyElems[:]
+	d.Elems = copyElems[:]
 
 	return removedPos
 }
 
-func (doc *BasicDocument) InsertAtPosition(pos Position, val string) int {
-	var index int
-	var copyDoc []Element
+func (d *BasicDocument) pushBackHistory(op interface {}) {
+	d.History = append(d.History, op)
+}
 
-	for i, e := range doc.Elems {
-		if doc.PositionManager.PositionIsLessThan(e.Position, pos) {
+func (d *BasicDocument) InsertAtIndex(val string, index int) Position {
+	if index < 0 || index > len(d.Elems) - 2 {
+		log.Fatalf("Document: invalid insert index %v", index)
+	}
+
+	if len(d.Elems) < 2 {
+		log.Fatal("Document: invalid document")
+	}
+
+	prevPos := (d.Elems[index]).Position
+	afterPos := (d.Elems[index + 1]).Position
+	position := d.PositionManager.AllocPositionBetween(prevPos, afterPos)
+
+	d.DocInsert(index + 1, Element{val, position})
+	d.pushBackHistory(OpDelete {Pos: position})
+
+	return position
+}
+
+func (d *BasicDocument) DeleteAtIndex(index int) Position {
+	if index < 0 || index > len(d.Elems) - 2 {
+		log.Fatalf("Document: invalid delete index %v", index)
+	}
+
+	position := d.DocDelete(index + 1)
+	d.pushBackHistory(OpInsert {Pos: position})
+
+	return position
+}
+
+func (d *BasicDocument) ToString() string {
+	res := ""
+	for i := 0; i < len(d.Elems); i++ {
+		res += d.Elems[i].Data
+	}
+	return res
+}
+
+func (d *BasicDocument) InsertAtPosition(pos Position, val string) int {
+	var index int
+
+	for i, e := range d.Elems {
+		if d.PositionManager.PositionIsLessThan(e.Position, pos) {
 			index = i
 		} else {
 			break
 		}
 	}
 
-	copyDoc = append(copyDoc, doc.Elems[:index + 1]...)
-	copyDoc = append(copyDoc, Element{val, pos})
-	copyDoc = append(copyDoc, doc.Elems[index + 1:]...)
-	
-	doc.Elems = copyDoc[:]
+	d.DocInsert(index + 1, Element{Position: pos, Data: val})
+	d.pushBackHistory(OpInsert {Pos: pos, Val: val})
 
 	return index
 }
 
-func (doc *BasicDocument) DeleteAtPosition (pos Position) int {
+func (d *BasicDocument) DeleteAtPosition (pos Position) int {
 	var index int
-	var copyDoc []Element
 
-	for i, e := range doc.Elems {
-		if doc.PositionManager.PositionsEqual(e.Position, pos) {
+	for i, e := range d.Elems {
+		if d.PositionManager.PositionsEqual(e.Position, pos) {
 			index = i
 			break
 		}
 	}
 
-	copyDoc = append(copyDoc, doc.Elems[:index]...)
-	copyDoc = append(copyDoc, doc.Elems[index + 1:]...)
-
-	doc.Elems = copyDoc[:]
+	d.DocDelete(index)
+	d.pushBackHistory(OpDelete {Pos: pos})
 
 	return index
 }
 
-func (doc *BasicDocument) Serialize() ([]byte, error) {
+func (d *BasicDocument) Serialize() ([]byte, error) {
 	w := new(bytes.Buffer)
 	e := gob.NewEncoder(w)
 
-	err := e.Encode(doc.Elems)
+	err := e.Encode(d.Elems)
+	if err != nil {
+		return nil, err
+	}
+
+	err = e.Encode(d.History)
 	if err != nil {
 		return nil, err
 	}
@@ -147,11 +168,16 @@ func (doc *BasicDocument) Serialize() ([]byte, error) {
 	return w.Bytes(), nil
 }
 
-func (doc *BasicDocument) Deserialize(data []byte) error {
+func (d *BasicDocument) Deserialize(data []byte) error {
 	r := bytes.NewBuffer(data)
-	d := gob.NewDecoder(r)
+	dec := gob.NewDecoder(r)
 
-	err := d.Decode(&doc.Elems)
+	err := dec.Decode(&d.Elems)
+	if err != nil {
+		return err
+	}
+
+	err = dec.Decode(&d.History)
 	if err != nil {
 		return err
 	}

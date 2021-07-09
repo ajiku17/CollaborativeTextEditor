@@ -80,12 +80,12 @@ func (server *Server) HandleRequest(socket net.Conn) {
 			case synceddoc.ConnectRequest:
 				server.setSocketId(data.(synceddoc.ConnectRequest).Id, socket)
 				go server.syncNewConnection(data.(synceddoc.ConnectRequest).Id)
-			case synceddoc.ChangeCRDTInsert:
+			case synceddoc.MessageCRDTInsert:
 				server.Changes = append(server.Changes, data)
-				go server.sendAll(data.(synceddoc.ChangeCRDTInsert).ManagerId, data)
-			case synceddoc.ChangeCRDTDelete:
+				go server.sendAll(data.(synceddoc.MessageCRDTInsert).ManagerId, data)
+			case synceddoc.MessageCRDTDelete:
 				server.Changes = append(server.Changes, data)
-				go server.sendAll(data.(synceddoc.ChangeCRDTDelete).ManagerId, data)
+				go server.sendAll(data.(synceddoc.MessageCRDTDelete).ManagerId, data)
 			default:
 				fmt.Println("Different type")
 		}

@@ -5,34 +5,32 @@ import (
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
 )
 
-const CHANGE_INSERT      = "insert"
-const CHANGE_DELETE      = "delete"
-const CHANGE_PEER_CURSOR = "peer_cursor"
-const CONNECT = "connect"
+const MESSAGE_INSERT      = "insert"
+const MESSAGE_DELETE      = "delete"
+const MESSAGE_PEER_CURSOR = "peer_cursor"
+const MESSAGE_CONNECT     = "connect"
 
-type ChangeInsert struct {
-	ManagerId utils.UUID
+type MessageInsert struct {
 	Value string
 	Index int
 }
 
-type ChangeCRDTInsert struct {
+type MessageDelete struct {
+	Index int
+}
+
+type MessageCRDTInsert struct {
 	ManagerId utils.UUID
 	Value    string
 	Position crdt.Position
 }
 
-type ChangeDelete struct {
-	ManagerId utils.UUID
-	Index int
-}
-
-type ChangeCRDTDelete struct {
+type MessageCRDTDelete struct {
 	ManagerId utils.UUID
 	Position crdt.Position
 }
 
-type ChangePeerCursor struct {
+type MessagePeerCursor struct {
 	PeerID          utils.UUID
 	CursorPosition  int
 }

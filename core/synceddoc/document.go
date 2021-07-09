@@ -10,10 +10,12 @@ import (
 // | ChangeInsert     |
 // | ChangeDelete     |
 // | ChangePeerCursor |
-type ChangeListener func (changeName string, change interface {})
+type ChangeListener func (changeName string, change interface {}, aux interface{})
 
-type PeerConnectedListener func (peerId utils.UUID, cursorPosition int)
-type PeerDisconnectedListener func (peerId utils.UUID)
+type PeerConnectedListener func (peerId utils.UUID, cursorPosition int, aux interface{})
+type PeerDisconnectedListener func (peerId utils.UUID, aux interface{})
+
+type Op interface{}
 
 type Document interface {
 	GetID() utils.UUID
@@ -24,7 +26,9 @@ type Document interface {
 	 * Disconnect kills the network connection. User is still able to edit the document
 	 * and later call Connect, if they wish so, to synchronize changes made while offline.
 	 */
-	Connect()
+	Connect(changeListener ChangeListener,
+		peerConnectedListener PeerConnectedListener,
+		peerDisconnectedListener PeerDisconnectedListener)
 	Disconnect()
 
 	/*
@@ -45,9 +49,10 @@ type Document interface {
 	 * Document modifications
 	 */
 
-	// InsertAtIndex currently only supports strings of length 1
-	InsertAtIndex(index int, val string)
-	DeleteAtIndex(index int)
+	// LocalInsert currently only supports strings of length 1
+	LocalInsert(index int, val string)
+	LocalDelete(index int)
+	ApplyRemoteOp(peerId utils.UUID, op Op, aux interface{})
 	SetCursor(index int)
 
 	/*
