@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"sync"
+
 	"github.com/ajiku17/CollaborativeTextEditor/core/crdt"
 	"github.com/ajiku17/CollaborativeTextEditor/core/network"
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
-	"sync"
 )
 
 type SyncedDocument struct {
@@ -26,6 +27,7 @@ type SyncedDocument struct {
 
 func (doc *SyncedDocument) Connect() {
 	doc.syncManager.Connect()
+	doc.syncManager.BroadcastMessage(ConnectRequest{doc.id})
 }
 
 func (doc *SyncedDocument) Disconnect() {
@@ -33,6 +35,7 @@ func (doc *SyncedDocument) Disconnect() {
 }
 
 func initDocState(doc *SyncedDocument) {
+	doc.id = utils.GenerateNewID()
 	doc.siteId = utils.GenerateNewID()
 	doc.localDocument = crdt.NewBasicDocument(crdt.NewBasicPositionManager(doc.siteId))
 	doc.cursorPosition = 0
@@ -47,6 +50,15 @@ func setListeners(doc *SyncedDocument, changeListener ChangeListener,
 	setChangeListener(doc, changeListener)
 	setPeerConnectedListener(doc, peerConnectedListener)
 	setPeerDisconnectedListener(doc, peerDisconnectedListener)
+}
+
+func registerTypes() {
+	gob.Register(ConnectRequest{})
+	gob.Register(ChangeInsert{})
+	gob.Register(ChangeCRDTInsert{})
+	gob.Register(ChangeDelete{})
+	gob.Register(ChangeCRDTDelete{})
+	gob.Register(ChangePeerCursor{})
 }
 
 func setPeerDisconnectedListener(doc *SyncedDocument, listener PeerDisconnectedListener) {
@@ -68,18 +80,17 @@ func setPeerConnectedListener(doc *SyncedDocument, listener PeerConnectedListene
 func setChangeListener(doc *SyncedDocument, listener ChangeListener) {
 	doc.syncManager.SetOnMessageReceiveListener(func (message interface{}) {
 		switch message.(type) {
-		case ChangeCRDTInsert:
-			change := message.(ChangeCRDTInsert)
-			insertIndex := doc.localDocument.InsertAtPosition(change.Position, change.Value)
-
-			listener(CHANGE_INSERT, ChangeInsert {Index: insertIndex, Value: change.Value})
-		case ChangeCRDTDelete:
-			change := message.(ChangeCRDTDelete)
-			deleteIndex := doc.localDocument.DeleteAtPosition(change.Position)
-
-			listener(CHANGE_DELETE, ChangeDelete {Index: deleteIndex})
-		case ChangePeerCursor:
-			listener(CHANGE_PEER_CURSOR, message)
+			case ChangeCRDTInsert:
+				change := message.(ChangeCRDTInsert)
+				// insertIndex := doc.localDocument.InsertAtPosition(change.Position, change.Value)
+				doc.localDocument.InsertAtPosition(change.Position, change.Value)
+				// listener(CHANGE_INSERT, ChangeInsert {ManagerId:doc.id, Index: insertIndex, Value: change.Value})
+			case ChangeCRDTDelete:
+				change := message.(ChangeCRDTDelete)
+				deleteIndex := doc.localDocument.DeleteAtPosition(change.Position)
+				listener(CHANGE_DELETE, ChangeDelete {ManagerId:doc.id, Index: deleteIndex})
+			case ChangePeerCursor:
+				listener(CHANGE_PEER_CURSOR, message)
 		}
 	})
 }
@@ -94,6 +105,7 @@ func New(syncManager network.Manager, changeListener ChangeListener,
 	syncedDoc.syncManager = syncManager
 	initDocState(syncedDoc)
 	setListeners(syncedDoc, changeListener, peerConnectedListener, peerDisconnectedListener)
+	registerTypes()
 
 	return syncedDoc
 }
@@ -192,8 +204,7 @@ func (doc *SyncedDocument) InsertAtIndex(index int, val string) {
 	defer doc.mu.Unlock()
 
 	pos := doc.localDocument.InsertAtIndex(val, index)
-
-	doc.syncManager.BroadcastMessage(ChangeCRDTInsert {Position: pos, Value: val})
+	doc.syncManager.BroadcastMessage(ChangeCRDTInsert {ManagerId:doc.id, Position: pos, Value: val})
 }
 
 func (doc *SyncedDocument) DeleteAtIndex(index int) {
@@ -202,7 +213,7 @@ func (doc *SyncedDocument) DeleteAtIndex(index int) {
 
 	pos := doc.localDocument.DeleteAtIndex(index)
 
-	doc.syncManager.BroadcastMessage(ChangeCRDTDelete{Position: pos})
+	doc.syncManager.BroadcastMessage(ChangeCRDTDelete{ManagerId:doc.id, Position: pos})
 }
 
 func (doc *SyncedDocument) SetCursor(index int) {
@@ -221,4 +232,8 @@ func (doc *SyncedDocument) Close() {
 
 func (doc *SyncedDocument) ToString() string {
 	return "[Document " + string(doc.id) + "]" + doc.localDocument.ToString()
+}
+
+func (doc *SyncedDocument) GetDocument() crdt.Document {
+	return doc.localDocument
 }

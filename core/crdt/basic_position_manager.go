@@ -2,8 +2,11 @@ package crdt
 
 import (
 	"encoding/gob"
+	"fmt"
 	"log"
 	"math"
+	"strconv"
+	"strings"
 
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
 )
@@ -202,4 +205,29 @@ func (manager *BasicPositionManager) AllocPositionBetween(prevPos, afterPos Posi
 	return nil
 }
 
+func ToBasicPosition(position string) Position  {
+	result_position := new(BasicPosition)
+	i := 0
+	for i < len(position) {
+		if position[i] == '(' {
+			pos, _ := strconv.Atoi(position[1:strings.Index(position, ",")])
+			position = position[strings.Index(position, ",") + 1:]
+			site, _ := strconv.Atoi(position[:strings.Index(position, ")")])
+			position = position[strings.Index(position, ")"):]
+			identifier := Identifier{pos, utils.UUID(site)}
+			*result_position = append(*result_position, identifier)
+			position = position[1:]
+		} else {
+			i ++
+		}
+	}
+	return *result_position
+}
 
+func BasicPositionToString(pos BasicPosition) string {
+	res := ""
+	for _, identifier := range pos {
+		res += fmt.Sprintf("(%d,%d)", identifier.Pos, identifier.Site)
+	}
+	return res
+}
