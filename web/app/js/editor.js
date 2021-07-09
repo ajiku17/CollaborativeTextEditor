@@ -153,7 +153,7 @@ inputElement.onchange = (e) => {
         const textContent = e.target.result
         docId = DocumentDeserialize(Uint8Array.from(textContent.split(",").map(function (item) {
             return parseInt(item, 10)
-        })), initCallback)
+        })), initCallback, onChange, onPeerConnect, onPeerDisconnect)
         documentLoaded(docId)
     }
     reader.onerror = (e) => {
