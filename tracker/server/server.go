@@ -1,23 +1,18 @@
-package main
+package server
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"github.com/ajiku17/CollaborativeTextEditor/tracker/table"
 	"net/http"
-	"os"
-	"sync"
 )
 
-type Tracker struct {
-	table map[string] []string
-	mu    sync.Mutex
+type HttpTracker struct {
+	Table *table.Table
 }
 
-var tracker = new(Tracker)
-
-func registerHandler(w http.ResponseWriter, r *http.Request) {
+func (t *HttpTracker) registerHandler(w http.ResponseWriter, r *http.Request) {
 	arguments := r.URL.Query()
 
 	docId, ok := arguments["doc"]
@@ -32,19 +27,10 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	remoteAddr := addr[0]
-
-	tracker.mu.Lock()
-	peers, ok := tracker.table[docId[0]]
-	if !ok {
-		peers = []string{}
-	}
-
-	tracker.table[docId[0]] = append(peers, remoteAddr)
-	tracker.mu.Unlock()
+	t.Table.Register(docId[0], addr[0])
 }
 
-func getHandler(w http.ResponseWriter, r *http.Request) {
+func (t *HttpTracker) getHandler(w http.ResponseWriter, r *http.Request) {
 	arguments := r.URL.Query()
 
 	docId, ok := arguments["doc"]
@@ -53,41 +39,44 @@ func getHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tracker.mu.Lock()
-	
-	peers, ok := tracker.table[docId[0]]
-	if !ok {
-		peers = []string{}
+	peersJson, err := json.Marshal(t.Table.Get(docId[0]))
+	if err != nil {
+		fmt.Println("an error occurred while marshaling", err)
 	}
-
-	tracker.mu.Unlock()
-
-	peersJson, _ := json.Marshal(peers)
 	w.Header().Set("Content-Type", "application/json")
 
-	_, err := w.Write(peersJson)
+	peerList := make([]string, 0)
+	err = json.Unmarshal(peersJson, &peerList)
+	if err != nil {
+		fmt.Println("an error occurred while unmarshaling", err)
+	}
+
+	_, err = w.Write(peersJson)
 	if err != nil {
 		fmt.Println("an error occurred while writing", err)
 	}
 }
 
-func initState() {
-	tracker.table = make(map[string] []string)
+func (t *HttpTracker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	switch r.URL.Path  {
+	case "/get":
+		t.getHandler(w, r)
+	case "/register":
+		t.registerHandler(w, r)
+	}
 }
 
-func main() {
-	args := os.Args
-	if len(args) == 1 {
-		fmt.Println("Usage: server [port]")
-		return
-	}
+func NewHttpTracker() *HttpTracker {
+	t := new(HttpTracker)
 
-	port := ":" + args[1]
+	t.Table = table.New()
+	return t
+}
 
-	initState()
+func Start (port string) error {
+	tracker := NewHttpTracker()
 
-	http.HandleFunc("/register/", registerHandler)
-	http.HandleFunc("/get/", getHandler)
+	http.Handle("/", tracker)
 
-	log.Fatal(http.ListenAndServe(port, nil))
+	return http.ListenAndServe(port, nil)
 }
