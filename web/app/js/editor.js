@@ -1,4 +1,4 @@
-fd = -1
+docId = -1
 
 editorTextArea = document.getElementById("collaborative-text-editor")
 
@@ -18,7 +18,8 @@ function enableEditor() {
     editor.options.readOnly = false
 }
 
-function documentLoaded() {
+function documentLoaded(docId) {
+    pushState(docId)
     enableEditor()
 }
 
@@ -34,11 +35,11 @@ function onChange(editor, change) {
 
             for (var i = 0; i < change.text.length; i++) {
                 if (i > 0) {
-                    DocumentInsertAt(fd, "\n", offset)
+                    DocumentInsertAt(docId, "\n", offset)
                     offset++
                 }
                 for (var j = 0; j < change.text[i].length; j++) {
-                    DocumentInsertAt(fd, change.text[i][j],  offset)
+                    DocumentInsertAt(docId, change.text[i][j],  offset)
                     offset++
                 }
             }
@@ -52,10 +53,10 @@ function onChange(editor, change) {
             });
             for (var i = 0; i < change.removed.length; i++) {
                 if (i > 0) {
-                    DocumentDeleteAt(fd, offset)
+                    DocumentDeleteAt(docId, offset)
                 }
                 for (var j = 0; j < change.removed[i].length; j++) {
-                    DocumentDeleteAt(fd, offset)
+                    DocumentDeleteAt(docId, offset)
                 }
             }
 
@@ -64,7 +65,7 @@ function onChange(editor, change) {
 }
 
 function onCursorActivity(editor) {
-    DocumentChangeCursor(fd, editor.getDoc().indexFromPos(editor.getCursor()))
+    DocumentChangeCursor(docId, editor.getDoc().indexFromPos(editor.getCursor()))
 }
 
 function onDocChange(changeName, changeObj) {
@@ -89,7 +90,6 @@ function onDocChange(changeName, changeObj) {
         case "peer_cursor":
             break
     }
-
 }
 
 function onPeerConnect(peerId, cursorPos) {
@@ -100,19 +100,25 @@ function onPeerDisconnect(peerId) {
     console.log("peer ", peerId, " disconnected")
 }
 
+function pushState(docId) {
+    var path = '/doc=' + docId
+    console.log('pushing state ' + path);
+    history.pushState('', '', path);
+}
+
 function openNewDoc() {
     editor.setValue("")
-    fd = DocumentNew(onDocChange, onPeerConnect, onPeerDisconnect)
-    documentLoaded()
+    docId = DocumentNew(onDocChange, onPeerConnect, onPeerDisconnect)
+    documentLoaded(docId)
 }
 
 function saveLocal() {
-    let serializedDoc = DocumentSerialize(fd)
+    let serializedDoc = DocumentSerialize(docId)
     downloadFile(serializedDoc, "your-document.txt")
 }
 
 function closeDoc() {
-    DocumentClose(fd)
+    DocumentClose(docId)
     editor.setValue("")
     disableEditor()
 }
@@ -145,10 +151,10 @@ inputElement.onchange = (e) => {
     const reader = new FileReader()
     reader.onload = (e) => {
         const textContent = e.target.result
-        fd = DocumentDeserialize(Uint8Array.from(textContent.split(",").map(function (item) {
+        docId = DocumentDeserialize(Uint8Array.from(textContent.split(",").map(function (item) {
             return parseInt(item, 10)
         })), initCallback)
-        documentLoaded()
+        documentLoaded(docId)
     }
     reader.onerror = (e) => {
         const error = e.target.error

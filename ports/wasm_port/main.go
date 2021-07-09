@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/ajiku17/CollaborativeTextEditor/core/network"
 	"github.com/ajiku17/CollaborativeTextEditor/core/synceddoc"
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
 	"syscall/js"
@@ -11,20 +10,20 @@ import (
 var docManager *DocumentManager
 
 func buildChangeCallback(changeCallback js.Value) synceddoc.ChangeListener {
-	return func (changeName string, change interface {}) {
+	return func (changeName string, change interface {}, aux interface{}) {
 		changeObj := make(map[string]interface{})
 
 		changeObj["changeName"] = changeName
 
 		switch change.(type) {
-		case synceddoc.ChangeInsert:
-			changeObj["index"] = change.(synceddoc.ChangeInsert).Index
-			changeObj["value"] = change.(synceddoc.ChangeInsert).Value
-		case synceddoc.ChangeDelete:
-			changeObj["index"] = change.(synceddoc.ChangeDelete).Index
-		case synceddoc.ChangePeerCursor:
-			changeObj["peerId"] = change.(synceddoc.ChangePeerCursor).PeerID
-			changeObj["cursorPos"] = change.(synceddoc.ChangePeerCursor).CursorPosition
+		case synceddoc.MessageInsert:
+			changeObj["index"] = change.(synceddoc.MessageInsert).Index
+			changeObj["value"] = change.(synceddoc.MessageInsert).Value
+		case synceddoc.MessageDelete:
+			changeObj["index"] = change.(synceddoc.MessageDelete).Index
+		case synceddoc.MessagePeerCursor:
+			changeObj["peerId"] = change.(synceddoc.MessagePeerCursor).PeerID
+			changeObj["cursorPos"] = change.(synceddoc.MessagePeerCursor).CursorPosition
 		}
 
 		changeCallback.Invoke(changeName, changeObj)
@@ -32,13 +31,13 @@ func buildChangeCallback(changeCallback js.Value) synceddoc.ChangeListener {
 }
 
 func buildPeerConnectedCallback(peerConnectedCallback js.Value) synceddoc.PeerConnectedListener {
-	return func (peerId utils.UUID, cursorPosition int) {
+	return func (peerId utils.UUID, cursorPosition int, aux interface{}) {
 		peerConnectedCallback.Invoke(string(peerId), cursorPosition)
 	}
 }
 
 func buildPeerDisconnectedCallback(peerDisconnectedCallback js.Value) synceddoc.PeerDisconnectedListener {
-	return func (peerId utils.UUID) {
+	return func (peerId utils.UUID, aux interface{}) {
 		peerDisconnectedCallback.Invoke(string(peerId))
 	}
 }
@@ -50,19 +49,19 @@ func DocumentOpen(this js.Value, i []js.Value) interface {} {
 	peerConnectedCallback := i[3]
 	peerDisconnectedCallback := i[4]
 
-	doc, err := synceddoc.Open(documentId, network.NewDummyManager(),
-		buildChangeCallback(changeCallback),
-		buildPeerConnectedCallback(peerConnectedCallback),
-		buildPeerDisconnectedCallback(peerDisconnectedCallback))
+	doc, err := synceddoc.Open(documentId)
 	if err != nil {
 		fmt.Println("error: ", err)
 		return nil
 	}
 
-	fd := docManager.PutDocument(doc)
+	doc.ConnectSignals(buildChangeCallback(changeCallback),
+		buildPeerConnectedCallback(peerConnectedCallback),
+		buildPeerDisconnectedCallback(peerDisconnectedCallback))
+	docId := docManager.PutDocument(doc)
 	initCallback.Invoke(doc.ToString())
 
-	return fd
+	return docId
 }
 
 func DocumentDeserialize(this js.Value, i []js.Value) interface {} {
@@ -76,21 +75,21 @@ func DocumentDeserialize(this js.Value, i []js.Value) interface {} {
 
 	js.CopyBytesToGo(serialized, i[0])
 
-	doc, err := synceddoc.Load(serialized, network.NewDummyManager(),
-		buildChangeCallback(changeCallback),
-		buildPeerConnectedCallback(peerConnectedCallback),
-		buildPeerDisconnectedCallback(peerDisconnectedCallback))
+	doc, err := synceddoc.Load(serialized)
 	if err != nil {
 		fmt.Println("error: ", err)
 		return nil
 	}
 
-	fd := docManager.PutDocument(doc)
+	doc.ConnectSignals(buildChangeCallback(changeCallback),
+		buildPeerConnectedCallback(peerConnectedCallback),
+		buildPeerDisconnectedCallback(peerDisconnectedCallback))
+	docId := docManager.PutDocument(doc)
 
 	// call init callback
 	initCallback.Invoke(doc.ToString())
 
-	return int(fd)
+	return string(docId)
 }
 
 func DocumentNew(this js.Value, i []js.Value) interface {} {
@@ -98,19 +97,21 @@ func DocumentNew(this js.Value, i []js.Value) interface {} {
 	peerConnectedCallback := i[1]
 	peerDisconnectedCallback := i[2]
 
-	doc := synceddoc.New(network.NewDummyManager(), buildChangeCallback(changeCallback),
+	doc := synceddoc.New()
+
+	doc.ConnectSignals(buildChangeCallback(changeCallback),
 		buildPeerConnectedCallback(peerConnectedCallback),
 		buildPeerDisconnectedCallback(peerDisconnectedCallback))
 
-	fd := docManager.PutDocument(doc)
+	docId := docManager.PutDocument(doc)
 
-	return int(fd)
+	return string(docId)
 }
 
 func DocumentClose(this js.Value, i []js.Value) interface {} {
-	fd := i[0].Int()
+	docId := i[0].String()
 
-	doc, err := docManager.GetDocument(FileDescriptor(fd))
+	doc, err := docManager.GetDocument(DocumentID(docId))
 
 	if err != nil {
 		fmt.Println("error: ", err)
@@ -119,51 +120,51 @@ func DocumentClose(this js.Value, i []js.Value) interface {} {
 
 	doc.Close()
 
-	docManager.RemoveDocument(FileDescriptor(fd))
+	docManager.RemoveDocument(DocumentID(docId))
 
 	return nil
 }
 
 func DocumentInsertAt(this js.Value, i []js.Value) interface {} {
-	fd := i[0].Int()
+	docId := i[0].String()
 	value := i[1].String()
 	index := i[2].Int()
 
-	doc, err := docManager.GetDocument(FileDescriptor(fd))
+	doc, err := docManager.GetDocument(DocumentID(docId))
 
 	if err != nil {
 		fmt.Println("error: ", err)
 		return -1
 	}
 
-	doc.InsertAtIndex(index, value)
+	doc.LocalInsert(index, value)
 
-	fmt.Printf("Calling DocumentInsertAt on fd: %v index: %d, value: %s after insert: %s\n", fd, index, value, doc.ToString())
+	fmt.Printf("Calling DocumentInsertAt on docId: %v index: %d, value: %s after insert: %s\n", docId, index, value, doc.ToString())
 	return nil
 }
 
 func DocumentDeleteAt(this js.Value, i []js.Value) interface {} {
-	fd := i[0].Int()
+	docId := i[0].String()
 	index := i[1].Int()
 
-	doc, err := docManager.GetDocument(FileDescriptor(fd))
+	doc, err := docManager.GetDocument(DocumentID(docId))
 
 	if err != nil {
 		fmt.Println(err)
 		return -1
 	}
 
-	doc.DeleteAtIndex(index)
+	doc.LocalDelete(index)
 
-	fmt.Printf("Calling DocumentDeleteAt on fd: %v index: %d, after delete: %s\n", fd, index, doc.ToString())
+	fmt.Printf("Calling DocumentDeleteAt on docId: %v index: %d, after delete: %s\n", docId, index, doc.ToString())
 	return nil
 }
 
 func DocumentChangeCursor(this js.Value, i []js.Value) interface {} {
-	fd := i[0].Int()
+	docId := i[0].String()
 	index := i[1].Int()
 
-	doc, err := docManager.GetDocument(FileDescriptor(fd))
+	doc, err := docManager.GetDocument(DocumentID(docId))
 
 	if err != nil {
 		fmt.Println(err)
@@ -171,14 +172,14 @@ func DocumentChangeCursor(this js.Value, i []js.Value) interface {} {
 	}
 
 	doc.SetCursor(index)
-	fmt.Printf("Calling DocumentChangeCursor on fd: %v index: %d doc: %s\n", fd, index, doc.ToString())
+	fmt.Printf("Calling DocumentChangeCursor on docId: %v index: %d doc: %s\n", docId, index, doc.ToString())
 	return nil
 }
 
 func DocumentSerialize(this js.Value, i []js.Value) interface {} {
-	fd := i[0].Int()
+	docId := i[0].String()
 
-	doc, err := docManager.GetDocument(FileDescriptor(fd))
+	doc, err := docManager.GetDocument(DocumentID(docId))
 
 	if err != nil {
 		return []interface{}{-1}
@@ -211,11 +212,11 @@ func SetPeerDisconnectedListener(doc synceddoc.Document, callback js.Value) {
 }
 
 func DocumentSetListener(this js.Value, i []js.Value) interface {} {
-	fd := i[0].Int()
+	docId := i[0].String()
 	callbackName := i[1].String()
 	callback := i[2]
 
-	doc, err := docManager.GetDocument(FileDescriptor(fd))
+	doc, err := docManager.GetDocument(DocumentID(docId))
 
 	if err != nil {
 		return -1
@@ -230,34 +231,6 @@ func DocumentSetListener(this js.Value, i []js.Value) interface {} {
 	return nil
 }
 
-func DocumentConnect(this js.Value, i []js.Value) interface {} {
-	fd := i[0].Int()
-
-	doc, err := docManager.GetDocument(FileDescriptor(fd))
-
-	if err != nil {
-		return -1
-	}
-
-	doc.Connect()
-
-	return nil
-}
-
-func DocumentDisconnect(this js.Value, i []js.Value) interface {} {
-	fd := i[0].Int()
-
-	doc, err := docManager.GetDocument(FileDescriptor(fd))
-
-	if err != nil {
-		return -1
-	}
-
-	doc.Disconnect()
-
-	return nil
-}
-
 func registerCallbacks() {
 	js.Global().Set("DocumentOpen", js.FuncOf(DocumentOpen))
 	js.Global().Set("DocumentDeserialize", js.FuncOf(DocumentDeserialize))
@@ -268,8 +241,6 @@ func registerCallbacks() {
 	js.Global().Set("DocumentChangeCursor", js.FuncOf(DocumentChangeCursor))
 	js.Global().Set("DocumentSerialize", js.FuncOf(DocumentSerialize))
 	js.Global().Set("DocumentSetListener", js.FuncOf(DocumentSetListener))
-	js.Global().Set("DocumentConnect", js.FuncOf(DocumentConnect))
-	js.Global().Set("DocumentDisconnect", js.FuncOf(DocumentDisconnect))
 }
 
 func main() {

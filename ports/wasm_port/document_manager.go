@@ -3,42 +3,31 @@ package main
 import (
 	"errors"
 	"github.com/ajiku17/CollaborativeTextEditor/core/synceddoc"
+	"github.com/ajiku17/CollaborativeTextEditor/utils"
 )
 
-type FileDescriptor int64
+type DocumentID utils.UUID
 
 type DocumentManager struct {
-	nextFd FileDescriptor
-	openDocuments map[FileDescriptor] synceddoc.Document
+	openDocuments map[DocumentID] synceddoc.Document
 }
 
 func NewDocumentManager() *DocumentManager {
 	manager := new(DocumentManager)
 
-	manager.nextFd = 1
-	manager.openDocuments = make(map[FileDescriptor] synceddoc.Document)
+	manager.openDocuments = make(map[DocumentID] synceddoc.Document)
 
 	return manager
 }
 
+func (manager *DocumentManager) PutDocument(doc synceddoc.Document) DocumentID {
+	manager.openDocuments[DocumentID(doc.GetID())] = doc
 
-func (manager *DocumentManager) GetNextFd() FileDescriptor {
-	res := manager.nextFd
-	manager.nextFd++
-
-	return res
+	return DocumentID(doc.GetID())
 }
 
-func (manager *DocumentManager) PutDocument(doc synceddoc.Document) FileDescriptor {
-	res := manager.GetNextFd()
-
-	manager.openDocuments[res] = doc
-
-	return res
-}
-
-func (manager *DocumentManager) GetDocument(fd FileDescriptor) (synceddoc.Document, error) {
-	doc, ok := manager.openDocuments[fd]
+func (manager *DocumentManager) GetDocument(docId DocumentID) (synceddoc.Document, error) {
+	doc, ok := manager.openDocuments[docId]
 
 	if !ok {
 		return nil, errors.New("document not found")
@@ -47,8 +36,8 @@ func (manager *DocumentManager) GetDocument(fd FileDescriptor) (synceddoc.Docume
 	return doc, nil
 }
 
-func (manager *DocumentManager) RemoveDocument(fd FileDescriptor) {
-	delete(manager.openDocuments, fd)
+func (manager *DocumentManager) RemoveDocument(docId DocumentID) {
+	delete(manager.openDocuments, docId)
 }
 
 
