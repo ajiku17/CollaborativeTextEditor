@@ -7,9 +7,8 @@ import (
 // ChangeListener
 // change is one of several types:
 //  ------------------
-// | ChangeInsert     |
-// | ChangeDelete     |
-// | ChangePeerCursor |
+// | MessageInsert    |
+// | MessageDelete    |
 type ChangeListener func (changeName string, change interface {}, aux interface{})
 
 type PeerConnectedListener func (peerId utils.UUID, cursorPosition int, aux interface{})
@@ -20,16 +19,10 @@ type Op interface{}
 type Document interface {
 	GetID() utils.UUID
 
-	/*
-	 * Connects/Disconnects to/from the network.
-	 * Connect synchronizes any changes made to the document by current or remote peers.
-	 * Disconnect kills the network connection. User is still able to edit the document
-	 * and later call Connect, if they wish so, to synchronize changes made while offline.
-	 */
-	Connect(changeListener ChangeListener,
+	// ConnectSignals sets signal handlers
+	ConnectSignals(changeListener ChangeListener,
 		peerConnectedListener PeerConnectedListener,
 		peerDisconnectedListener PeerDisconnectedListener)
-	Disconnect()
 
 	/*
 	 * Atomically sets listeners, without missing any changes.

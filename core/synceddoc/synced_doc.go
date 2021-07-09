@@ -35,15 +35,11 @@ type SyncedDocument struct {
 	mu     sync.Mutex
 }
 
-func (d *SyncedDocument) Connect(changeListener ChangeListener,
+func (d *SyncedDocument) ConnectSignals(changeListener ChangeListener,
 	peerConnectedListener PeerConnectedListener,
 	peerDisconnectedListener PeerDisconnectedListener) {
 
 	d.setListeners(changeListener, peerConnectedListener, peerDisconnectedListener)
-}
-
-func (d *SyncedDocument) Disconnect() {
-
 }
 
 func initDocState(d *SyncedDocument) {

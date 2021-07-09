@@ -195,22 +195,85 @@ func TestSerialize(t *testing.T) {
 	AssertTrue(t, nd.ToString() == text)
 }
 
+func onChangeTest(changeName string, change interface {}, aux interface{}) {
+	h := aux.(*[]rune)
+
+	switch change.(type) {
+	case synceddoc.MessageInsert:
+		ch := change.(synceddoc.MessageInsert)
+		newH := (*h)[:ch.Index]
+		newH = append(newH, rune(ch.Value[0]))
+		*h = append(newH, (*h)[ch.Index:]...)
+	case synceddoc.MessageDelete:
+		ch := change.(synceddoc.MessageDelete)
+		newH := (*h)[:ch.Index]
+		*h = append(newH, (*h)[ch.Index + 1:]...)
+	}
+}
+
 // make changes on the document offline, and later call connect.
 // peers should receive those changes after connect is called.
-func TestConnect(t *testing.T) {
+func TestConnectSignals(t *testing.T) {
+	d := synceddoc.New()
 
+	s := []rune {}
+
+	siteId := utils.UUID("site1")
+	doc := crdt.NewBasicDocument(crdt.NewBasicPositionManager(siteId))
+
+	d.ConnectSignals(onChangeTest, nil, nil)
+
+	d.ApplyRemoteOp(siteId, crdt.OpInsert {
+		Pos: doc.InsertAtIndex("h", 0),
+		Val: "h",
+	}, &s)
+
+	AssertTrue(t, string(s) == "h")
+
+	d.ApplyRemoteOp(siteId, crdt.OpInsert {
+		Pos: doc.InsertAtIndex("e", 1),
+		Val: "e",
+	}, &s)
+	d.ApplyRemoteOp(siteId, crdt.OpInsert {
+		Pos: doc.InsertAtIndex("l", 2),
+		Val: "l",
+	}, &s)
+	d.ApplyRemoteOp(siteId, crdt.OpInsert {
+		Pos: doc.InsertAtIndex("l", 3),
+		Val: "l",
+	}, &s)
+	d.ApplyRemoteOp(siteId, crdt.OpInsert {
+		Pos: doc.InsertAtIndex("o", 4),
+		Val: "o",
+	}, &s)
+
+	AssertTrue(t, string(s) == "hello")
+
+	d.ApplyRemoteOp(siteId, crdt.OpDelete {
+		Pos: doc.DeleteAtIndex(0),
+	}, &s)
+
+	d.ApplyRemoteOp(siteId, crdt.OpDelete {
+		Pos: doc.DeleteAtIndex(2),
+	}, &s)
+
+	AssertTrue(t, string(s) == "elo")
+
+	d.ApplyRemoteOp(siteId, crdt.OpDelete {
+		Pos: doc.DeleteAtIndex(1),
+	}, &s)
+
+	d.ApplyRemoteOp(siteId, crdt.OpDelete {
+		Pos: doc.DeleteAtIndex(1),
+	}, &s)
+
+	d.ApplyRemoteOp(siteId, crdt.OpDelete {
+		Pos: doc.DeleteAtIndex(0),
+	}, &s)
+
+	AssertTrue(t, string(s) == "")
 }
 
-// after calling disconnect peer should not receive any more updates from other peers.
-func TestDisconnect(t *testing.T) {
-
-}
-
-// calls connect and disconnect multiple times on a single peer.
-// that peer should receive every update eventually from other peers.
-func TestConnectDisconnect(t *testing.T) {
-
-}
 
 // calls SetCursor and checks if peer documents are identical.
 func TestSetCursor(t *testing.T) {

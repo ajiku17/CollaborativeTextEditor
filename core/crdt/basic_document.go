@@ -148,7 +148,7 @@ func (d *BasicDocument) DeleteAtPosition (pos Position) int {
 	d.DocDelete(index)
 	d.pushBackHistory(OpDelete {Pos: pos})
 
-	return index
+	return index - 1
 }
 
 func (d *BasicDocument) Serialize() ([]byte, error) {
