@@ -20,10 +20,8 @@ func NewDocumentManager() *DocumentManager {
 	return manager
 }
 
-func (manager *DocumentManager) PutDocument(doc synceddoc.Document) DocumentID {
+func (manager *DocumentManager) PutDocument(doc synceddoc.Document) {
 	manager.openDocuments[DocumentID(doc.GetID())] = doc
-
-	return DocumentID(doc.GetID())
 }
 
 func (manager *DocumentManager) GetDocument(docId DocumentID) (synceddoc.Document, error) {

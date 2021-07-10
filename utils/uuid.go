@@ -6,6 +6,6 @@ import (
 
 type UUID string
 
-func GenerateNewID() UUID {
+func GenerateNewUUID() UUID {
 	return UUID(uuid.NewString())
 }

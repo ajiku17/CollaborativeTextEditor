@@ -10,6 +10,14 @@ var editor = CodeMirror.fromTextArea(editorTextArea, {
 editor.on("change", onChange);
 editor.on("cursorActivity", onCursorActivity);
 
+function disableButtons() {
+    console.log("buttons disabled")
+}
+
+function enableButtons() {
+    console.log("buttons enabled")
+}
+
 function disableEditor() {
     editor.options.readOnly = 'nocursor'
 }
@@ -101,7 +109,7 @@ function onPeerDisconnect(peerId) {
 }
 
 function pushState(docId) {
-    var path = '/doc=' + docId
+    var path = '?doc=' + docId
     console.log('pushing state ' + path);
     history.pushState('', '', path);
 }
@@ -115,6 +123,11 @@ function openNewDoc() {
 function saveLocal() {
     let serializedDoc = DocumentSerialize(docId)
     downloadFile(serializedDoc, "your-document.txt")
+}
+
+function openDocById(id) {
+    docId = DocumentOpen(id, initCallback, onDocChange, onPeerConnect, onPeerDisconnect)
+    documentLoaded(docId)
 }
 
 function closeDoc() {
@@ -163,5 +176,21 @@ inputElement.onchange = (e) => {
     reader.readAsText(file)
 }
 
-// initially the editor is disabled
-disableEditor()
+function parseReq () {
+    const queryString = window.location.search;
+    const urlParams = new URLSearchParams(queryString())
+
+    if (urlParams.has("doc")) {
+        openDocById(urlParams.get("doc"))
+    }
+}
+
+function initJS() {
+    // initially the editor is disabled
+    disableButtons()
+    disableEditor()
+
+    parseReq()
+
+    enableButtons()
+}

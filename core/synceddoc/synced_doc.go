@@ -43,8 +43,6 @@ func (d *SyncedDocument) ConnectSignals(changeListener ChangeListener,
 }
 
 func initDocState(d *SyncedDocument) {
-	d.id = utils.GenerateNewID()
-	d.siteId = utils.GenerateNewID()
 	d.localDocument = crdt.NewBasicDocument(crdt.NewBasicPositionManager(d.siteId))
 	d.cursorPosition = 0
 	d.peerCursorPositions = make(map[utils.UUID]int)
@@ -83,9 +81,11 @@ func setChangeListener(d *SyncedDocument, listener ChangeListener) {
 }
 
 // New creates a new, empty document
-func New() Document {
+func New(siteId string) Document {
 	doc := new (SyncedDocument)
 
+	doc.id = utils.GenerateNewUUID()
+	doc.siteId = utils.UUID(siteId)
 	initDocState(doc)
 	registerTypes()
 
@@ -93,8 +93,11 @@ func New() Document {
 }
 
 // Open downloads a document having the specified ID
-func Open(docId string) (Document, error) {
+func Open(siteId string, docId string) (Document, error) {
 	doc := new (SyncedDocument)
+
+	doc.id = utils.UUID(docId)
+	doc.siteId = utils.UUID(siteId)
 
 	initDocState(doc)
 
@@ -102,9 +105,11 @@ func Open(docId string) (Document, error) {
 }
 
 // Load deserializes serializedData and creates a document
-func Load(serializedData []byte) (Document, error) {
+func Load(siteId string, serializedData []byte) (Document, error) {
 	doc := new (SyncedDocument)
 
+	doc.id = utils.GenerateNewUUID()
+	doc.siteId = utils.UUID(siteId)
 	initDocState(doc)
 
 	r := bytes.NewBuffer(serializedData)
