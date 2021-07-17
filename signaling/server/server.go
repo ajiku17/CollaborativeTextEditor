@@ -1,11 +1,12 @@
 package server
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/gob"
 	"errors"
 	"fmt"
-	"io"
+	"github.com/ajiku17/CollaborativeTextEditor/signaling"
 	"log"
 	"net/http"
 	"nhooyr.io/websocket"
@@ -17,27 +18,36 @@ type SignalingServer struct {
 
 	serveMux http.ServeMux
 
-	subscribersMu sync.Mutex
-	subscribers   map[string] []subscriber
+	mu sync.Mutex
+	docSubscribers  map[string] map[string]struct{} // docId -> [peer1, peer2, peer3]
+	clients         map[string]client    // peerId -> [peer]
 
 	logf func(f string, v ...interface{})
 }
 
-type subscriber struct {
+type client struct {
 	c             *websocket.Conn
 	peerId        string
-	sdpDesc       string
-	msgChan       chan []byte
+	inboundMsgs   chan []byte
+	outboundMsgs  chan []byte
 	terminateSlow func()
 }
 
+func registerTypes() {
+	gob.Register(signaling.SignalMessage{})
+	gob.Register(signaling.Subscription{})
+}
+
 func NewServer() *SignalingServer {
+	registerTypes()
+
 	s := &SignalingServer{
-		logf:                    log.Printf,
-		subscribers:             make(map[string][]subscriber),
+		logf:           log.Printf,
+		docSubscribers: make(map[string]map[string]struct{}),
+		clients:        make(map[string]client),
 	}
 
-	s.serveMux.HandleFunc("/subscribe", s.subscribeHandler)
+	s.serveMux.HandleFunc("/connect", s.connectHandler)
 
 	return s
 }
@@ -46,80 +56,166 @@ func (s *SignalingServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.serveMux.ServeHTTP(w, r)
 }
 
-func (s *SignalingServer) subscribeHandler(w http.ResponseWriter, r *http.Request) {
+func (s *SignalingServer) connectHandler(w http.ResponseWriter, r *http.Request) {
 	c, err := websocket.Accept(w, r, nil)
 	if err != nil {
-		s.logf("socket accept error %v", err)
+		fmt.Printf("socket accept error %v", err)
 		return
 	}
 	defer c.Close(websocket.StatusInternalError, "")
 
 	arguments := r.URL.Query()
-	var docId, peerId string
-
-	if docId = arguments.Get("doc"); len(docId) == 0 {
-		s.logf("must provide docId to subscribe to")
-		return
-	}
+	var peerId string
 
 	if peerId = arguments.Get("peerId"); len(peerId) == 0 {
-		s.logf("must provide peerId of the subscriber")
+		fmt.Printf("must provide peerId of the client")
 		return
 	}
 
-	err = s.subscribe(c, r.Context(), docId, peerId)
-
-	if errors.Is(err, context.Canceled) {
-		return
-	}
-
-	if websocket.CloseStatus(err) == websocket.StatusNormalClosure ||
-		websocket.CloseStatus(err) == websocket.StatusGoingAway {
-		return
-	}
-
+	err = s.connect(c, r.Context(), peerId)
 	if err != nil {
-		s.logf("error: %v", err)
+		if websocket.CloseStatus(err) != websocket.StatusNormalClosure {
+			fmt.Printf("subscribeHandler error: %v\n", err)
+		}
 		return
 	}
 }
 
-func (s *SignalingServer) subscribe (c *websocket.Conn, ctx context.Context, docId, peerId string) error {
-	ctx = c.CloseRead(ctx)
-
-	sub := subscriber {
-		peerId : peerId,
-		msgChan: make(chan []byte, 16),
+func (s *SignalingServer) connect (c *websocket.Conn, ctx context.Context, peerId string) error {
+	sub := client{
+		c            : c,
+		peerId       : peerId,
+		outboundMsgs : make(chan []byte, 16),
+		inboundMsgs  : make(chan []byte, 16),
 		terminateSlow: func () {
 			c.Close(websocket.StatusPolicyViolation, "connection too slow")
 		},
 	}
 
-	s.putSubscriber(docId, sub)
-	defer s.deleteSubscriber(docId)
+	s.putClient(sub)
+	defer s.deleteClient(sub)
 
-	err := s.sendPeerData(docId, sub)
-	if err != nil {
-		return fmt.Errorf("failed to send peer data {%v}", err)
-	}
+	errc := make(chan error, 1)
 
-	go s.listen(sub)
+	go sub.receiver(ctx, errc)
+	go sub.sender(ctx, errc)
 
+	go s.requestProcessor(ctx, sub, errc)
+
+	return <- errc
+}
+
+func (s *SignalingServer) requestProcessor(ctx context.Context, cl client, errc chan error) {
 	for {
-		select {
-		case msg := <- sub.msgChan:
-			err := writeTimeout(ctx, time.Second * 5, c, msg)
-			if err != nil {
-				return err
-			}
-		case <- ctx.Done():
-			return ctx.Err()
+		msg := <- cl.inboundMsgs
+
+		response, err := s.processRequest(ctx, cl, msg)
+		if err != nil {
+			errc <- err
+			return
+		}
+
+		if response != nil {
+			cl.outboundMsgs <- response
 		}
 	}
 }
 
-func (s *SignalingServer) listen(sub subscriber) {
+func (s *SignalingServer) processRequest(ctx context.Context, cl client, rqs []byte) ([]byte, error) {
+	var rsp []byte
 
+	r := bytes.NewBuffer(rqs)
+	dec := gob.NewDecoder(r)
+
+	msg := signaling.SignalMessage{}
+
+	err := dec.Decode(&msg)
+	if err != nil {
+		return nil, err
+	}
+
+	if msg.MsgType == signaling.MESSAGE_SUBSCRIBE {
+		//fmt.Println("decoding", msg.Msg)
+
+		r := bytes.NewBuffer(msg.Msg)
+		dec := gob.NewDecoder(r)
+
+		subscription := signaling.Subscription{}
+
+		err := dec.Decode(&subscription)
+		if err != nil {
+			return nil, fmt.Errorf("invalid subscription request: %s", err)
+		}
+
+		s.putSubscriber(subscription.DocId, cl)
+
+		rsp, err = s.getPeerData(subscription.DocId, cl)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to send peer data {%v}", err)
+		}
+	} else if msg.MsgType == signaling.MESSAGE_FORWARD {
+		//fmt.Println("request processor: sending ", msg.Msg, "to", msg.Receiver)
+		s.sendMessageToPeer(msg.Receiver, msg.Msg)
+	} else {
+		return nil, fmt.Errorf("unsuported message type")
+	}
+
+	return rsp, nil
+}
+
+func (s *SignalingServer) sendMessageToPeer(peerId string, msg []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if sub, ok := s.clients[peerId]; ok {
+		sub.outboundMsgs <- msg
+	}
+}
+
+func (s *client) receiver(ctx context.Context, errc chan error) {
+	for {
+		//fmt.Println("receiver trying to read")
+		msg, err := readTimeout(ctx, time.Second * 100, s.c)
+
+		if errors.Is(err, context.Canceled) ||
+			errors.Is(err, context.DeadlineExceeded) ||
+			websocket.CloseStatus(err) == websocket.StatusUnsupportedData {
+			fmt.Println("receiver continue; error", err)
+			continue
+		}
+
+		if err != nil {
+			if websocket.CloseStatus(err) != websocket.StatusNormalClosure {
+				fmt.Println("receiver error", err)
+			}
+			errc <- err
+			return
+		}
+
+		if msg != nil {
+			//fmt.Printf("received message: %v\n", msg)
+
+			s.inboundMsgs <- msg
+		}
+	}
+}
+
+func (s *client) sender(ctx context.Context, errc chan error) {
+	for {
+		select {
+		case msg := <- s.outboundMsgs:
+			err := writeTimeout(ctx, time.Second * 5, s.c, msg)
+			if err != nil {
+				fmt.Println("Sender error:", err)
+				errc <- err
+				return
+			}
+		case <- ctx.Done():
+			errc <- ctx.Err()
+			return
+		}
+	}
 }
 
 func writeTimeout (ctx context.Context, timeout time.Duration, c *websocket.Conn, msg []byte) error {
@@ -129,66 +225,78 @@ func writeTimeout (ctx context.Context, timeout time.Duration, c *websocket.Conn
 	return c.Write(ctx, websocket.MessageText, msg)
 }
 
-func (s *SignalingServer) sendPeerData(docId string, sub subscriber) error {
-	s.subscribersMu.Lock()
-	defer s.subscribersMu.Unlock()
+func readTimeout(ctx context.Context, timeout time.Duration, c *websocket.Conn) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	typ, data, err := c.Read(ctx)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if typ != websocket.MessageText {
+		c.Close(websocket.StatusUnsupportedData, "expected text data")
+		return nil, fmt.Errorf("expected text message but got %v", typ)
+	}
+
+	return data, nil
+}
+
+func (s *SignalingServer) getPeerData(docId string, sub client) ([]byte, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	peerIds := []string{}
-	for _, sb := range s.subscribers[docId] {
-		if sb.peerId != sub.peerId {
-			peerIds = append(peerIds, sb.peerId)
+	for peerId, _ := range s.docSubscribers[docId] {
+		if peerId != sub.peerId {
+			peerIds = append(peerIds, peerId)
 		}
 	}
 
-	payload, err := json.Marshal(peerIds)
+	w := new(bytes.Buffer)
+	e := gob.NewEncoder(w)
+
+	err := e.Encode(peerIds)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	select {
-	case sub.msgChan <- payload:
-	default:
-		go sub.terminateSlow()
-	}
-
-	return nil
+	return w.Bytes(), nil
 }
 
-func (s *SignalingServer) putSubscriber (docId string, sub subscriber) {
-	s.subscribersMu.Lock()
-	defer s.subscribersMu.Unlock()
+func (s *SignalingServer) putClient (cl client) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	if val, ok := s.subscribers[docId]; ok {
-		s.subscribers[docId] = append(val, sub)
+	s.clients[cl.peerId] = cl
+}
+
+func (s *SignalingServer) deleteClient (sub client) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.clients, sub.peerId)
+}
+
+func (s *SignalingServer) putSubscriber (docId string, sub client) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.docSubscribers[docId]; ok {
+		s.docSubscribers[docId][sub.peerId] = struct{}{}
 	}  else {
-		s.subscribers[docId] = []subscriber{sub}
+		s.docSubscribers[docId] = map[string] struct{} {
+			sub.peerId: {},
+		}
 	}
+
+	s.clients[sub.peerId] = sub
 }
 
-func (s *SignalingServer) deleteSubscriber (docId string) {
-	s.subscribersMu.Lock()
-	defer s.subscribersMu.Unlock()
+func (s *SignalingServer) deleteSubscriber (docId string, sub client) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	delete(s.subscribers, docId)
-}
-
-
-func echo(ctx context.Context, c *websocket.Conn) error {
-	typ, r, err := c.Reader(ctx)
-	if err != nil {
-		return err
-	}
-
-	w, err := c.Writer(ctx, typ)
-	if err != nil {
-		return err
-	}
-
-	_, err = io.Copy(w, r)
-	if err != nil {
-		return fmt.Errorf("failed to io.Copy: %w", err)
-	}
-
-	err = w.Close()
-	return err
+	delete(s.docSubscribers[docId], sub.peerId)
 }
