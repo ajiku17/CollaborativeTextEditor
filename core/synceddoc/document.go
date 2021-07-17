@@ -1,6 +1,7 @@
 package synceddoc
 
 import (
+	"github.com/ajiku17/CollaborativeTextEditor/core/crdt"
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
 )
 
@@ -18,6 +19,7 @@ type Op interface{}
 
 type Document interface {
 	GetID() utils.UUID
+	GetSiteID() utils.UUID
 
 	// ConnectSignals sets signal handlers
 	ConnectSignals(changeListener ChangeListener,
@@ -48,12 +50,16 @@ type Document interface {
 	ApplyRemoteOp(peerId utils.UUID, op Op, aux interface{})
 	SetCursor(index int)
 
+	// Get unbroadcasted local changes
+	NextUnbroadcastedChange() interface{}
+
 	/*
 	 * Closes the document, frees resources. Document becomes non editable.
 	 */
 	Close()
 
 	ToString() string
+	GetDocument() crdt.Document
 }
 
 /*

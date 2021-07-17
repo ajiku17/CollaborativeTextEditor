@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/ajiku17/CollaborativeTextEditor/core/crdt"
 	"net"
 	"sync"
 	"time"
@@ -48,11 +49,11 @@ func (server *Server) Listen() {
 	}
 }
 
-func (server *Server) sendAll(currId utils.UUID, data interface{}) {
+func (server *Server) sendAll(data synceddoc.OperationRequest) {
 	server.lock.Lock()
 	defer server.lock.Unlock()
-	for id, socket := range server.ConnectedSockets {
-		if id != currId {
+	for currId, socket := range server.ConnectedSockets {
+		if data.Id != currId {
 			socket.Write(utils.ToBytes(data))
 		}
 	}
@@ -73,19 +74,20 @@ func (server *Server) HandleRequest(socket net.Conn) {
 			continue
 		}
 
-		data := utils.FromBytes(receivedMessage)
+		data := utils.FromBytes(receivedMessage).(synceddoc.OperationRequest)
 
+		operation := data.Operation
 
-		switch data.(type) {
+		switch operation.(type) {
 			case synceddoc.ConnectRequest:
-				server.setSocketId(data.(synceddoc.ConnectRequest).Id, socket)
-				go server.syncNewConnection(data.(synceddoc.ConnectRequest).Id)
-			case synceddoc.MessageCRDTInsert:
+				server.setSocketId(operation.(synceddoc.ConnectRequest).Id, socket)
+				go server.syncNewConnection(operation.(synceddoc.ConnectRequest).Id)
+			case crdt.OpInsert:
 				server.Changes = append(server.Changes, data)
-				go server.sendAll(data.(synceddoc.MessageCRDTInsert).ManagerId, data)
-			case synceddoc.MessageCRDTDelete:
+				go server.sendAll(data)
+			case crdt.OpDelete:
 				server.Changes = append(server.Changes, data)
-				go server.sendAll(data.(synceddoc.MessageCRDTDelete).ManagerId, data)
+				go server.sendAll(data)
 			default:
 				fmt.Println("Different type")
 		}

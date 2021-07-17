@@ -10,6 +10,7 @@ import (
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
 )
 
+
 type LogEntry struct {
 	PeerId utils.UUID
 
@@ -26,6 +27,7 @@ type SyncedDocument struct {
 	localDocument crdt.Document
 
 	log []LogEntry
+	toNotifyNextIndex int
 
 	onChange         ChangeListener
 	onPeerConnect    PeerConnectedListener
@@ -47,6 +49,7 @@ func initDocState(d *SyncedDocument) {
 	d.cursorPosition = 0
 	d.peerCursorPositions = make(map[utils.UUID]int)
 	d.killed = false
+	d.toNotifyNextIndex = 0
 }
 
 func (d *SyncedDocument) setListeners(changeListener ChangeListener,
@@ -59,13 +62,16 @@ func (d *SyncedDocument) setListeners(changeListener ChangeListener,
 }
 
 func registerTypes() {
-	gob.Register(LogEntry{})
+	//gob.Register(LogEntry{})
 	gob.Register(ConnectRequest{})
+	gob.Register(crdt.OpInsert{})
+	gob.Register(crdt.OpDelete{})
 	gob.Register(MessageInsert{})
-	gob.Register(MessageCRDTInsert{})
+	//gob.Register(MessageCRDTInsert{})
 	gob.Register(MessageDelete{})
-	gob.Register(MessageCRDTDelete{})
-	gob.Register(MessagePeerCursor{})
+	gob.Register(OperationRequest{})
+	//gob.Register(MessageCRDTDelete{})
+	//gob.Register(MessagePeerCursor{})
 }
 
 func setPeerDisconnectedListener(d *SyncedDocument, listener PeerDisconnectedListener) {
@@ -141,6 +147,9 @@ func Load(siteId string, serializedData []byte) (Document, error) {
 
 func (d *SyncedDocument) GetID() utils.UUID {
 	return d.id
+}
+func (d *SyncedDocument) GetSiteID() utils.UUID {
+	return d.siteId
 }
 
 func (d *SyncedDocument) SetChangeListener(listener ChangeListener) {
@@ -255,6 +264,15 @@ func (d *SyncedDocument) incrementPeerLastLogSequence(peerId utils.UUID) {
 
 func (d *SyncedDocument) SetCursor(index int) {
 	d.cursorPosition = index
+}
+
+func (d *SyncedDocument) NextUnbroadcastedChange() interface{} {
+	if(d.toNotifyNextIndex >= len(d.log)) {
+		return nil
+	}
+	next := d.localDocument.GetNextHistoryData(d.toNotifyNextIndex)
+	d.toNotifyNextIndex ++
+	return &OperationRequest{d.siteId, next}
 }
 
 func (d *SyncedDocument) Close() {

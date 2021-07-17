@@ -9,4 +9,6 @@ type Document interface {
 	Deserialize([]byte) error
 	ToString() string
 	Length() int
+	GetNextHistoryData(index int) interface{}
+	GetHistory() []interface{}
 }

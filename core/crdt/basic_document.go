@@ -94,7 +94,7 @@ func (d *BasicDocument) InsertAtIndex(val string, index int) Position {
 	position := d.PositionManager.AllocPositionBetween(prevPos, afterPos)
 
 	d.DocInsert(index + 1, Element{val, position})
-	d.pushBackHistory(OpDelete {Pos: position})
+	d.pushBackHistory(OpInsert {Pos: position, Val: val})
 
 	return position
 }
@@ -105,7 +105,7 @@ func (d *BasicDocument) DeleteAtIndex(index int) Position {
 	}
 
 	position := d.DocDelete(index + 1)
-	d.pushBackHistory(OpInsert {Pos: position})
+	d.pushBackHistory(OpDelete {Pos: position})
 
 	return position
 }
@@ -130,7 +130,7 @@ func (d *BasicDocument) InsertAtPosition(pos Position, val string) int {
 	}
 
 	d.DocInsert(index + 1, Element{Position: pos, Data: val})
-	d.pushBackHistory(OpInsert {Pos: pos, Val: val})
+	//d.pushBackHistory(OpInsert {Pos: pos, Val: val})
 
 	return index
 }
@@ -183,4 +183,15 @@ func (d *BasicDocument) Deserialize(data []byte) error {
 	}
 
 	return nil
+}
+
+func (d *BasicDocument)GetNextHistoryData(index int) interface{} {
+	if index >= len(d.History) {
+		return nil
+	}
+	return d.History[index]
+}
+
+func (d *BasicDocument) GetHistory() []interface{} {
+	return d.History
 }
