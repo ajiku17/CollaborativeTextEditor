@@ -3,7 +3,8 @@ docId = -1
 editorTextArea = document.getElementById("collaborative-text-editor")
 
 var editor = CodeMirror.fromTextArea(editorTextArea, {
-    lineNumbers: true
+    lineNumbers: true,
+    theme: "base16-dark"
 });
 
 // set callbacks
@@ -114,6 +115,10 @@ function pushState(docId) {
     history.pushState('', '', path);
 }
 
+function popState() {
+    history.pushState('', '', "/");
+}
+
 function openNewDoc() {
     editor.setValue("")
     docId = DocumentNew(onDocChange, onPeerConnect, onPeerDisconnect)
@@ -133,7 +138,9 @@ function openDocById(id) {
 function closeDoc() {
     DocumentClose(docId)
     editor.setValue("")
+    popState()
     disableEditor()
+    inputElement.value = ""
 }
 
 function downloadFile(data, filename) {
