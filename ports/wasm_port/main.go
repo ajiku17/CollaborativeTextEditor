@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/ajiku17/CollaborativeTextEditor/core/network"
 	"github.com/ajiku17/CollaborativeTextEditor/core/synceddoc"
-	"github.com/ajiku17/CollaborativeTextEditor/tracker/client"
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
 	"syscall/js"
 )
@@ -12,7 +11,6 @@ import (
 const TRACKER_URL = "127.0.0.1:9090"
 
 var docManager    *DocumentManager
-var trackerClient *client.Client
 var siteId         utils.UUID
 
 func buildChangeCallback(changeCallback js.Value) synceddoc.ChangeListener {
@@ -62,7 +60,7 @@ func DocumentOpen(this js.Value, i []js.Value) interface {} {
 		return nil
 	}
 
-	manager := network.NewDummyManager(string(siteId))
+	manager := network.NewDummyManager(string(siteId), doc)
 
 	doc.ConnectSignals(buildChangeCallback(changeCallback),
 		buildPeerConnectedCallback(peerConnectedCallback),
@@ -98,7 +96,7 @@ func DocumentDeserialize(this js.Value, i []js.Value) interface {} {
 		return nil
 	}
 
-	manager := network.NewDummyManager(string(siteId))
+	manager := network.NewDummyManager(string(siteId), doc)
 
 	doc.ConnectSignals(buildChangeCallback(changeCallback),
 		buildPeerConnectedCallback(peerConnectedCallback),
@@ -123,7 +121,7 @@ func DocumentNew(this js.Value, i []js.Value) interface {} {
 
 	siteId = utils.GenerateNewUUID()
 	doc := synceddoc.New(string(siteId))
-	manager := network.NewDummyManager(string(siteId))
+	manager := network.NewDummyManager(string(siteId), doc)
 
 	doc.ConnectSignals(buildChangeCallback(changeCallback),
 		buildPeerConnectedCallback(peerConnectedCallback),
@@ -278,7 +276,6 @@ func registerCallbacks() {
 func main() {
 	c := make(chan struct{}, 0)
 
-	trackerClient = client.New(TRACKER_URL)
 	docManager = NewDocumentManager()
 	registerCallbacks()
 	fmt.Println("Callbacks registered")

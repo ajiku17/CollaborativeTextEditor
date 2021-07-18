@@ -45,8 +45,10 @@ type Document interface {
 	// LocalInsert currently only supports strings of length 1
 	LocalInsert(index int, val string)
 	LocalDelete(index int)
-	ApplyRemoteOp(peerId utils.UUID, op Op, aux interface{})
 	SetCursor(index int)
+
+	// ApplyRemoteOp is used from a synchronization manager to apply remote ops
+	ApplyRemoteOp(peerId utils.UUID, op Op, aux interface{})
 
 	/*
 	 * Closes the document, frees resources. Document becomes non editable.

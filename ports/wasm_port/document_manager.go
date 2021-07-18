@@ -27,6 +27,11 @@ func NewDocumentManager() *DocumentManager {
 }
 
 func (manager *DocumentManager) PutDocument(doc Document) {
+	for _, d := range manager.openDocuments {
+		d.NetManager.Stop()
+		d.Doc.Close()
+	}
+
 	manager.openDocuments[DocumentID(doc.Doc.GetID())] = doc
 }
 
@@ -41,6 +46,11 @@ func (manager *DocumentManager) GetDocument(docId DocumentID) (Document, error) 
 }
 
 func (manager *DocumentManager) RemoveDocument(docId DocumentID) {
+	d, ok := manager.openDocuments[docId]
+	if ok {
+		d.NetManager.Stop()
+		d.Doc.Close()
+	}
 	delete(manager.openDocuments, docId)
 }
 
