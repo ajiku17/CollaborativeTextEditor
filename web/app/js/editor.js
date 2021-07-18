@@ -178,7 +178,7 @@ inputElement.onchange = (e) => {
 
 function parseReq () {
     const queryString = window.location.search;
-    const urlParams = new URLSearchParams(queryString())
+    const urlParams = new URLSearchParams(queryString)
 
     if (urlParams.has("doc")) {
         openDocById(urlParams.get("doc"))
