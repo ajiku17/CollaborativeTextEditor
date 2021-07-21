@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
+	"github.com/ajiku17/CollaborativeTextEditor/core/network"
 	"github.com/ajiku17/CollaborativeTextEditor/core/synceddoc"
-	"github.com/ajiku17/CollaborativeTextEditor/tracker/client"
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
 	"syscall/js"
 )
@@ -11,7 +11,6 @@ import (
 const TRACKER_URL = "127.0.0.1:9090"
 
 var docManager    *DocumentManager
-var trackerClient *client.Client
 var siteId         utils.UUID
 
 func buildChangeCallback(changeCallback js.Value) synceddoc.ChangeListener {
@@ -61,11 +60,20 @@ func DocumentOpen(this js.Value, i []js.Value) interface {} {
 		return nil
 	}
 
+	manager := network.NewDummyManager(string(siteId), doc)
+
 	doc.ConnectSignals(buildChangeCallback(changeCallback),
 		buildPeerConnectedCallback(peerConnectedCallback),
 		buildPeerDisconnectedCallback(peerDisconnectedCallback))
-	docManager.PutDocument(doc)
+	docManager.PutDocument(Document{
+		Doc:        doc,
+		NetManager: manager,
+	})
+
+	// call js init callback
 	initCallback.Invoke(doc.ToString())
+
+	manager.Start()
 
 	return doc.GetID()
 }
@@ -88,17 +96,20 @@ func DocumentDeserialize(this js.Value, i []js.Value) interface {} {
 		return nil
 	}
 
+	manager := network.NewDummyManager(string(siteId), doc)
+
 	doc.ConnectSignals(buildChangeCallback(changeCallback),
 		buildPeerConnectedCallback(peerConnectedCallback),
 		buildPeerDisconnectedCallback(peerDisconnectedCallback))
-	docManager.PutDocument(doc)
+	docManager.PutDocument(Document{
+		Doc:        doc,
+		NetManager: manager,
+	})
 
 	// call init callback
 	initCallback.Invoke(doc.ToString())
 
-	peers := trackerClient.Get(string(doc.GetID()))
-
-	fmt.Println("document", doc.GetID(), "peers:", peers)
+	manager.Start()
 
 	return string(doc.GetID())
 }
@@ -110,16 +121,18 @@ func DocumentNew(this js.Value, i []js.Value) interface {} {
 
 	siteId = utils.GenerateNewUUID()
 	doc := synceddoc.New(string(siteId))
+	manager := network.NewDummyManager(string(siteId), doc)
 
 	doc.ConnectSignals(buildChangeCallback(changeCallback),
 		buildPeerConnectedCallback(peerConnectedCallback),
 		buildPeerDisconnectedCallback(peerDisconnectedCallback))
 
-	docManager.PutDocument(doc)
+	docManager.PutDocument(Document{
+		Doc:        doc,
+		NetManager: manager,
+	})
 
-	peers := trackerClient.Get(string(doc.GetID()))
-
-	fmt.Println("document", doc.GetID(), "peers:", peers)
+	manager.Start()
 
 	return string(doc.GetID())
 }
@@ -134,7 +147,8 @@ func DocumentClose(this js.Value, i []js.Value) interface {} {
 		return nil
 	}
 
-	doc.Close()
+	doc.Doc.Close()
+	doc.NetManager.Stop()
 
 	docManager.RemoveDocument(DocumentID(docId))
 
@@ -153,9 +167,9 @@ func DocumentInsertAt(this js.Value, i []js.Value) interface {} {
 		return -1
 	}
 
-	doc.LocalInsert(index, value)
+	doc.Doc.LocalInsert(index, value)
 
-	fmt.Printf("Calling DocumentInsertAt on docId: %v index: %d, value: %s after insert: %s\n", docId, index, value, doc.ToString())
+	fmt.Printf("Calling DocumentInsertAt on docId: %v index: %d, value: %s after insert: %s\n", docId, index, value, doc.Doc.ToString())
 	return nil
 }
 
@@ -170,9 +184,9 @@ func DocumentDeleteAt(this js.Value, i []js.Value) interface {} {
 		return -1
 	}
 
-	doc.LocalDelete(index)
+	doc.Doc.LocalDelete(index)
 
-	fmt.Printf("Calling DocumentDeleteAt on docId: %v index: %d, after delete: %s\n", docId, index, doc.ToString())
+	fmt.Printf("Calling DocumentDeleteAt on docId: %v index: %d, after delete: %s\n", docId, index, doc.Doc.ToString())
 	return nil
 }
 
@@ -187,8 +201,8 @@ func DocumentChangeCursor(this js.Value, i []js.Value) interface {} {
 		return -1
 	}
 
-	doc.SetCursor(index)
-	fmt.Printf("Calling DocumentChangeCursor on docId: %v index: %d doc: %s\n", docId, index, doc.ToString())
+	doc.Doc.SetCursor(index)
+	fmt.Printf("Calling DocumentChangeCursor on docId: %v index: %d doc: %s\n", docId, index, doc.Doc.ToString())
 	return nil
 }
 
@@ -201,7 +215,7 @@ func DocumentSerialize(this js.Value, i []js.Value) interface {} {
 		return []interface{}{-1}
 	}
 
-	serialized, err := doc.Serialize()
+	serialized, err := doc.Doc.Serialize()
 	if err != nil {
 		return -1
 	}
@@ -239,9 +253,9 @@ func DocumentSetListener(this js.Value, i []js.Value) interface {} {
 	}
 
 	switch callbackName {
-	case "onChange": SetChangeListener(doc, callback)
-	case "onPeerConnect": SetPeerConnectedListener(doc, callback)
-	case "onPeerDisconnect": SetPeerDisconnectedListener(doc, callback)
+	case "onChange": SetChangeListener(doc.Doc, callback)
+	case "onPeerConnect": SetPeerConnectedListener(doc.Doc, callback)
+	case "onPeerDisconnect": SetPeerDisconnectedListener(doc.Doc, callback)
 	}
 
 	return nil
@@ -262,7 +276,6 @@ func registerCallbacks() {
 func main() {
 	c := make(chan struct{}, 0)
 
-	trackerClient = client.New(TRACKER_URL)
 	docManager = NewDocumentManager()
 	registerCallbacks()
 	fmt.Println("Callbacks registered")

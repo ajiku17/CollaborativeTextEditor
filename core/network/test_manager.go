@@ -1,71 +1,94 @@
 package network
 
+import (
+	"fmt"
+	"github.com/ajiku17/CollaborativeTextEditor/core/crdt"
+	"github.com/ajiku17/CollaborativeTextEditor/core/synceddoc"
+	"github.com/ajiku17/CollaborativeTextEditor/utils"
+	"sync"
+	"time"
+)
 
-//type TestManager struct {
-//	id utils.UUID
-//	document *synceddoc.Document
-//	alive bool
-//	connected bool
-//}
-//
-//func NewTestManager(id utils.UUID, synccedDoc *synceddoc.Document) Manager {
-//	manager := new (TestManager)
-//	manager.id = id
-//	manager.document = synccedDoc
-//	return manager
-//}
-//
-//func (d TestManager) GetId() utils.UUID {
-//	return d.id
-//}
-//
-//func (d TestManager) Start() {
-//	d.alive = true
-//	d.connected = true
-//	//go d.messageReceived()
-//	//go d.broadcastMessages()
-//}
-//
-//func (d TestManager) Stop() {
-//	d.alive = false
-//	d.connected = true
-//}
-//
-//func (d TestManager) Kill() {
-//	d.alive = false
-//	d.connected = false
-//}
-
-func (d NetworkClient) IsAlive() bool {
-	return d.alive
+type DummyManager struct {
+	Id      utils.UUID
+	doc     synceddoc.Document
+	crdt    crdt.Document
+	stopped bool
+	mu      sync.Mutex
 }
 
-//
-//func (d TestManager) messageReceived() {
-//	//socket := manager.socket
-//	//for manager.alive {
-//	//	received := make([]byte, 1024)
-//	//	_, err := socket.Read(received)
-//	//	if err != nil {
-//	//		socket.SetDeadline(time.Now().Add(time.Second))
-//	//		continue
-//	//	}
-//	//	data := utils.FromBytes(received).(synceddoc.OperationRequest)
-//	//	op := data.Operation
-//	//	(*manager.document).ApplyRemoteOp(data.Id, op, nil)
-//	//}
-//}
-//
-//func (d TestManager) broadcastMessages() {
-//	//for manager.alive {
-//	//	nextChange := (*manager.document).NextUnbroadcastedChange()
-//	//	if nextChange == nil {
-//	//		continue
-//	//	}
-//	//	fmt.Println("sending ", nextChange)
-//	//	bytes := utils.ToBytes(synceddoc.OperationRequest{manager.id, nextChange})
-//	//	if bytes != nil {
-//	//		go manager.sendRequest(bytes)
-//	//	}
-//	//}
-//}
+func (d *DummyManager) GetId() utils.UUID {
+	return d.Id
+}
+
+func (d *DummyManager) Start() {
+	fmt.Println("starting manager")
+	go d.sync()
+}
+
+// random insert or delete ops
+func (d *DummyManager) randOp() synceddoc.Op {
+	if d.crdt.Length() > 0 {
+		n := utils.RandBetween(1, 2)
+
+		if n == 1 {
+			val := "a"
+
+			index := utils.RandBetween(0, d.crdt.Length())
+
+			return crdt.OpInsert{
+				Pos: d.crdt.InsertAtIndex(val, index),
+				Val: val,
+			}
+		} else {
+			index := utils.RandBetween(0, d.crdt.Length() - 1)
+
+			return crdt.OpDelete{
+				Pos: d.crdt.DeleteAtIndex(index),
+			}
+		}
+	} else {
+		val := "a"
+
+		return crdt.OpInsert{
+			Pos: d.crdt.InsertAtIndex(val, 0),
+			Val: val,
+		}
+	}
+}
+
+// apply remote op every 2 seconds
+func (d *DummyManager) sync () {
+	for {
+		d.mu.Lock()
+		if d.stopped {
+			d.mu.Unlock()
+			return
+		}
+		d.mu.Unlock()
+
+		d.doc.ApplyRemoteOp(d.Id, d.randOp(), nil)
+		time.Sleep(2 * time.Second)
+	}
+}
+
+func (d *DummyManager) Stop() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	d.stopped = true
+}
+
+func (d *DummyManager) Kill() {
+	d.Stop()
+}
+
+func NewDummyManager(id string, doc synceddoc.Document) Manager {
+	manager := new (DummyManager)
+	manager.Id = utils.UUID(id)
+	manager.doc = doc
+	manager.stopped = false
+
+	manager.crdt = crdt.NewBasicDocument(crdt.NewBasicPositionManager(manager.Id))
+	return manager
+}

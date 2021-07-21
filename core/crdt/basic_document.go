@@ -29,6 +29,7 @@ type BasicDocument struct {
 func NewBasicDocument(positionManager PositionManager) *BasicDocument {
 	gob.Register(OpInsert{})
 	gob.Register(OpDelete{})
+	gob.Register(Element{})
 
 	doc := new(BasicDocument)
 
