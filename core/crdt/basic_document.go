@@ -130,7 +130,7 @@ func (d *BasicDocument) InsertAtPosition(pos Position, val string) int {
 	}
 
 	d.DocInsert(index + 1, Element{Position: pos, Data: val})
-	//d.pushBackHistory(OpInsert {Pos: pos, Val: val})
+	d.pushBackHistory(OpInsert {Pos: pos, Val: val})
 
 	return index
 }

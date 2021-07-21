@@ -126,6 +126,7 @@ function saveLocal() {
 }
 
 function openDocById(id) {
+    console.log("Opening ", id)
     docId = DocumentOpen(id, initCallback, onDocChange, onPeerConnect, onPeerDisconnect)
     documentLoaded(docId)
 }

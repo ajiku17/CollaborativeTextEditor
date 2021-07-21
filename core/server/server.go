@@ -69,7 +69,9 @@ func (server *Server) HandleRequest(socket net.Conn) {
 	for {
 		receivedMessage := make([]byte, 1024)
 		_, err := socket.Read(receivedMessage)
+		//fmt.Println("SErver reading")
 		if err != nil {
+			//fmt.Println(err)
 			socket.SetDeadline(time.Now().Add(time.Second))
 			continue
 		}
@@ -77,11 +79,14 @@ func (server *Server) HandleRequest(socket net.Conn) {
 		data := utils.FromBytes(receivedMessage).(synceddoc.OperationRequest)
 
 		operation := data.Operation
+		//fmt.Println("SErver got ", operation)
 
 		switch operation.(type) {
 			case synceddoc.ConnectRequest:
 				server.setSocketId(operation.(synceddoc.ConnectRequest).Id, socket)
 				go server.syncNewConnection(operation.(synceddoc.ConnectRequest).Id)
+			case synceddoc.DisconnectRequest:
+				server.removeSocketId(operation.(synceddoc.DisconnectRequest).Id)
 			case crdt.OpInsert:
 				server.Changes = append(server.Changes, data)
 				go server.sendAll(data)
@@ -105,11 +110,6 @@ func (server *Server) setSocketId(id utils.UUID, socket net.Conn) {
 }
 
 
-func (server *Server) IsConnected(id utils.UUID) bool {
-	for curr_id, _ := range server.ConnectedSockets {
-		if curr_id == id {
-			return true
-		}
-	}
-	return false
+func (server *Server) removeSocketId(id utils.UUID) {
+	delete(server.ConnectedSockets, id)
 }

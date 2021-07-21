@@ -16,7 +16,7 @@ func AssertTrue(t *testing.T, condition bool) {
 
 // calls InsertAt and checks if peer documents are identical.
 func TestLocalInsert(t *testing.T) {
-	d := synceddoc.New()
+	d := synceddoc.New(string(utils.GenerateNewUUID()))
 
 	d.LocalInsert(0, "h")
 	d.LocalInsert(1, "e")
@@ -32,7 +32,7 @@ func TestLocalInsert(t *testing.T) {
 
 	AssertTrue(t, d.ToString() == "hello world")
 
-	d = synceddoc.New()
+	d = synceddoc.New(string(utils.GenerateNewUUID()))
 	text := "hello everybody"
 	for i := len(text) - 1; i >= 0; i-- {
 		d.LocalInsert(0, string(text[i]))
@@ -40,7 +40,7 @@ func TestLocalInsert(t *testing.T) {
 
 	AssertTrue(t, d.ToString() == text)
 
-	d = synceddoc.New()
+	d = synceddoc.New(string(utils.GenerateNewUUID()))
 	text = "hey everyone"
 	for i := 0; i < len(text); i++ {
 		d.LocalInsert(i, string(text[i]))
@@ -51,7 +51,7 @@ func TestLocalInsert(t *testing.T) {
 
 // calls DeleteAt and checks if peer documents are identical.
 func TestLocalDelete(t *testing.T) {
-	d := synceddoc.New()
+	d := synceddoc.New(string(utils.GenerateNewUUID()))
 	text := "hello everybody"
 	for i := len(text) - 1; i >= 0; i-- {
 		d.LocalInsert(0, string(text[i]))
@@ -91,7 +91,7 @@ func TestLocalDelete(t *testing.T) {
 }
 
 func TestLocalInsertDelete(t *testing.T) {
-	d := synceddoc.New()
+	d := synceddoc.New(string(utils.GenerateNewUUID()))
 	text := "helow everybody"
 	for i := len(text) - 1; i >= 0; i-- {
 		d.LocalInsert(0, string(text[i]))
@@ -117,7 +117,7 @@ func TestLocalInsertDelete(t *testing.T) {
 }
 
 func TestApplyRemoteOp(t *testing.T) {
-	d := synceddoc.New()
+	d := synceddoc.New(string(utils.GenerateNewUUID()))
 
 	AssertTrue(t, d.ToString() == "")
 
@@ -178,7 +178,8 @@ func TestApplyRemoteOp(t *testing.T) {
 // calls serialize on the document.
 // returned value should later be deserialized into a valid document.
 func TestSerialize(t *testing.T) {
-	d := synceddoc.New()
+	siteId := utils.GenerateNewUUID()
+	d := synceddoc.New(string(siteId))
 	text := "hello everybody"
 	for i := len(text) - 1; i >= 0; i-- {
 		d.LocalInsert(0, string(text[i]))
@@ -188,7 +189,7 @@ func TestSerialize(t *testing.T) {
 	serialized, err := d.Serialize()
 	AssertTrue(t, err == nil)
 
-	nd, err := synceddoc.Load(serialized)
+	nd, err := synceddoc.Load(string(siteId), serialized)
 	AssertTrue(t, err == nil)
 
 	AssertTrue(t, nd.GetID() == docId)
@@ -214,7 +215,7 @@ func onChangeTest(changeName string, change interface {}, aux interface{}) {
 // make changes on the document offline, and later call connect.
 // peers should receive those changes after connect is called.
 func TestConnectSignals(t *testing.T) {
-	d := synceddoc.New()
+	d := synceddoc.New(string(utils.GenerateNewUUID()))
 
 	s := []rune {}
 
@@ -278,4 +279,16 @@ func TestConnectSignals(t *testing.T) {
 // calls SetCursor and checks if peer documents are identical.
 func TestSetCursor(t *testing.T) {
 
+}
+
+func TestOpenExistingDocument(t *testing.T) {
+	siteId := utils.GenerateNewUUID()
+	document1 := synceddoc.New(string(siteId))
+	documentId := document1.GetID()
+	document1.LocalInsert(0, "H")
+	document1.LocalInsert(1, "i")
+
+	document2, _ := synceddoc.Open(string(utils.GenerateNewUUID()), string(documentId))
+
+	AssertTrue(t, document2.GetDocument().Length() == 2)
 }

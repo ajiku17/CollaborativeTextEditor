@@ -39,6 +39,11 @@ type ConnectRequest struct {
 	Id          utils.UUID
 }
 
+type DisconnectRequest struct {
+	Id          utils.UUID
+}
+
+
 type OperationRequest struct {
 	Id utils.UUID
 	Operation interface{}

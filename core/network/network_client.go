@@ -12,6 +12,7 @@ type NetworkClient struct {
 	id utils.UUID
 	socket net.Conn
 	document *synceddoc.Document
+	//trackerClient *client.Client
 	alive bool
 }
 
@@ -20,6 +21,7 @@ func NewDocumentManager(id utils.UUID, synccedDoc *synceddoc.Document) Manager {
 	manager.id = id
 	manager.document = synccedDoc
 	manager.alive = false
+	//manager.trackerClient =
 	manager.connect()
 	return manager
 }
@@ -31,7 +33,7 @@ func (manager *NetworkClient) GetId() utils.UUID {
 func (manager *NetworkClient) Start() {
 	manager.alive = true
 	operationRequest := synceddoc.OperationRequest{manager.id, synceddoc.ConnectRequest{manager.id}}
-	go manager.sendRequest(utils.ToBytes(operationRequest))
+	manager.sendRequest(utils.ToBytes(operationRequest))
 	go manager.messageReceived()
 	go manager.broadcastMessages()
 }
@@ -42,6 +44,9 @@ func (manager *NetworkClient) Stop() {
 
 // Kill frees resources and
 func (manager *NetworkClient) Kill() {
+	manager.alive = false
+	operationRequest := synceddoc.OperationRequest{manager.id, synceddoc.DisconnectRequest{manager.id}}
+	manager.sendRequest(utils.ToBytes(operationRequest))
 	defer manager.socket.Close()
 }
 
@@ -73,17 +78,18 @@ func (manager *NetworkClient) messageReceived() {
 		}
 		data := utils.FromBytes(received).(synceddoc.OperationRequest)
 		op := data.Operation
+
 		(*manager.document).ApplyRemoteOp(data.Id, op, nil)
 	}
 }
 
 func (manager *NetworkClient) broadcastMessages() {
 	for manager.alive {
-		message := (*manager.document).NextUnbroadcastedChange()
-		if message == nil {
+		nextChange := (*manager.document).NextUnbroadcastedChange()
+		if nextChange == nil {
 			continue
 		}
-		bytes := utils.ToBytes(message)
+		bytes := utils.ToBytes(synceddoc.OperationRequest{manager.id, nextChange})
 		if bytes != nil {
 			go manager.sendRequest(bytes)
 		}
@@ -95,6 +101,7 @@ func (manager *NetworkClient)sendRequest(bytes []byte) {
 	for {
 		_, err := socket.Write(bytes)
 		if err != nil {
+			//fmt.Println(err)
 			socket.SetDeadline(time.Now().Add(time.Second))
 			continue
 		} else {
