@@ -1,4 +1,4 @@
-package server
+package signaling
 
 import (
 	"bytes"
@@ -6,7 +6,6 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
-	"github.com/ajiku17/CollaborativeTextEditor/signaling"
 	"log"
 	"net/http"
 	"nhooyr.io/websocket"
@@ -34,8 +33,8 @@ type client struct {
 }
 
 func registerTypes() {
-	gob.Register(signaling.SignalMessage{})
-	gob.Register(signaling.Subscription{})
+	gob.Register(SignalMessage{})
+	gob.Register(Subscription{})
 }
 
 func NewServer() *SignalingServer {
@@ -127,20 +126,20 @@ func (s *SignalingServer) processRequest(ctx context.Context, cl client, rqs []b
 	r := bytes.NewBuffer(rqs)
 	dec := gob.NewDecoder(r)
 
-	msg := signaling.SignalMessage{}
+	msg := SignalMessage{}
 
 	err := dec.Decode(&msg)
 	if err != nil {
 		return nil, err
 	}
 
-	if msg.MsgType == signaling.MESSAGE_SUBSCRIBE {
+	if msg.MsgType == MESSAGE_SUBSCRIBE {
 		//fmt.Println("decoding", msg.Msg)
 
 		r := bytes.NewBuffer(msg.Msg)
 		dec := gob.NewDecoder(r)
 
-		subscription := signaling.Subscription{}
+		subscription := Subscription{}
 
 		err := dec.Decode(&subscription)
 		if err != nil {
@@ -154,8 +153,8 @@ func (s *SignalingServer) processRequest(ctx context.Context, cl client, rqs []b
 		if err != nil {
 			return nil, fmt.Errorf("failed to send peer data {%v}", err)
 		}
-	} else if msg.MsgType == signaling.MESSAGE_FORWARD {
-		//fmt.Println("request processor: sending ", msg.Msg, "to", msg.Receiver)
+	} else if msg.MsgType == MESSAGE_FORWARD {
+		fmt.Println("request processor: sending ", msg.Msg, "to", msg.Receiver)
 		s.sendMessageToPeer(msg.Receiver, msg.Msg)
 	} else {
 		return nil, fmt.Errorf("unsuported message type")
@@ -176,7 +175,7 @@ func (s *SignalingServer) sendMessageToPeer(peerId string, msg []byte) {
 func (s *client) receiver(ctx context.Context, errc chan error) {
 	for {
 		//fmt.Println("receiver trying to read")
-		msg, err := readTimeout(ctx, time.Second * 100, s.c)
+		msg, err := read(ctx, s.c)
 
 		if errors.Is(err, context.Canceled) ||
 			errors.Is(err, context.DeadlineExceeded) ||
@@ -229,6 +228,21 @@ func readTimeout(ctx context.Context, timeout time.Duration, c *websocket.Conn) 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	typ, data, err := c.Read(ctx)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if typ != websocket.MessageText {
+		c.Close(websocket.StatusUnsupportedData, "expected text data")
+		return nil, fmt.Errorf("expected text message but got %v", typ)
+	}
+
+	return data, nil
+}
+
+func read(ctx context.Context, c *websocket.Conn) ([]byte, error) {
 	typ, data, err := c.Read(ctx)
 
 	if err != nil {

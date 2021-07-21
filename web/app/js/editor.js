@@ -132,6 +132,7 @@ function saveLocal() {
 
 function openDocById(id) {
     docId = DocumentOpen(id, initCallback, onDocChange, onPeerConnect, onPeerDisconnect)
+    console.log("docid", docId)
     documentLoaded(docId)
 }
 
@@ -187,17 +188,23 @@ function parseReq () {
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString)
 
+    console.log(urlParams)
     if (urlParams.has("doc")) {
+        console.log("opening doc by id", urlParams.get("doc"))
         openDocById(urlParams.get("doc"))
     }
 }
 
 function initJS() {
     // initially the editor is disabled
+    console.log("init js")
     disableButtons()
     disableEditor()
 
-    parseReq()
+    // parseReq()
 
+    console.log("disabling editor")
     enableButtons()
 }
+
+initJS()

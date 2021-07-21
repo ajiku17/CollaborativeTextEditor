@@ -7,7 +7,6 @@ import (
 	"encoding/gob"
 	"fmt"
 	"github.com/ajiku17/CollaborativeTextEditor/signaling"
-	"github.com/ajiku17/CollaborativeTextEditor/signaling/server"
 	"net/http/httptest"
 	"nhooyr.io/websocket"
 	"reflect"
@@ -207,7 +206,7 @@ func randString(n int) string {
 }
 
 func setupTest(t *testing.T) (url string, closeFn func()) {
-	s := server.NewServer()
+	s := signaling.NewServer()
 
 	srv := httptest.NewServer(s)
 	return srv.URL, func() {

@@ -100,6 +100,7 @@ func Open(siteId string, docId string) (Document, error) {
 	doc.siteId = utils.UUID(siteId)
 
 	initDocState(doc)
+	registerTypes()
 
 	return doc, nil
 }
