@@ -105,9 +105,7 @@ func (p *P2P) receiver() {
 			return
 		}
 
-		fmt.Println("waiting for message")
 		message, err := p.conn.NextMessage()
-		fmt.Println(p.peerId, "received payload")
 		if err != nil {
 			fmt.Println("p2p receiver error", err)
 			continue
@@ -308,7 +306,6 @@ func (p *P2P) signalMessage(peerId string, msg P2PMessage) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("sending Msg to", peerId, msg)
 	err = p.conn.SendPayload(peerId, payload)
 
 	return err

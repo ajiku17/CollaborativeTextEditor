@@ -60,9 +60,7 @@ func (c *Client) NextMessage() ([]byte, error) {
 
 	ctx := context.Background()
 
-	fmt.Println(c.peerId, "socket reading")
 	typ, data, err := c.c.Read(ctx)
-	fmt.Println(c.peerId, "socket read")
 
 	if err != nil {
 		return nil, err
@@ -138,7 +136,7 @@ func (c *Client) sendData(peer string, msgType string, payload []byte) error {
 
 	toSend := w.Bytes()
 
-	fmt.Println("sending message", toSend, "to peer", peer)
+	//fmt.Println("sending message", toSend, "to peer", peer)
 
 	err = c.c.Write(context.Background(), websocket.MessageText, toSend)
 	return err

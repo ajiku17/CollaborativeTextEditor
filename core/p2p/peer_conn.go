@@ -116,14 +116,11 @@ func (p *PeerConn) handleSignals(msgQueue chan interface{}) {
 
 			switch msg.(type) {
 			case ICECandidateMsg:
-				fmt.Println("peer", p, "received ice candidate message", msg)
+				fmt.Println("received ice candidate message", msg)
 				p.onICECandidateCallback(msg.(ICECandidateMsg))
 			case ConnAnswer:
-				fmt.Println("peer", p, "received answer", msg)
+				fmt.Println("received answer", msg)
 				p.onConnAnswerCallback(msg.(ConnAnswer))
-				//case ConnOffer:
-				//	fmt.Println("peer", p, "received offer", Msg)
-				//	p.onConnOffer(Msg.(ConnOffer))
 			}
 		case <- timer:
 			fmt.Println("peer conn timer fired off")
