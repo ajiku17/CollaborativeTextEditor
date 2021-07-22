@@ -1,4 +1,4 @@
-package table
+package tracker
 
 import "sync"
 
@@ -31,7 +31,7 @@ func (t *Table) Get (docId string) []string {
 	return peers
 }
 
-func New () *Table {
+func NewTable () *Table {
 	t := new(Table)
 
 	t.table = make(map[string] []string)

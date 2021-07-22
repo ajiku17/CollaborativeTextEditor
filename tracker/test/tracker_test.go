@@ -1,10 +1,9 @@
-package main
+package test
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/ajiku17/CollaborativeTextEditor/tracker/client"
-	"github.com/ajiku17/CollaborativeTextEditor/tracker/server"
+	"github.com/ajiku17/CollaborativeTextEditor/tracker"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -54,11 +53,11 @@ func parseGet(r io.Reader) []string {
 }
 
 func TestGet(t *testing.T) {
-	tracker := server.NewHttpTracker()
+	tr := tracker.NewHttpTracker()
 
-	tracker.Table.Register("doc1", "peer1")
+	tr.Table.Register("doc1", "peer1")
 
-	s := httptest.NewServer(tracker)
+	s := httptest.NewServer(tr)
 
 	get, err := http.Get(s.URL + "/get?doc=doc1")
 	if err != nil {
@@ -70,7 +69,7 @@ func TestGet(t *testing.T) {
 	AssertTrue(t, len(peerList) == 1)
 	AssertTrue(t, peerList[0] == "peer1")
 
-	tracker.Table.Register("doc1", "peer2")
+	tr.Table.Register("doc1", "peer2")
 	get, err = http.Get(s.URL + "/get?doc=doc1")
 	if err != nil {
 		t.Error(err)
@@ -86,15 +85,13 @@ func TestGet(t *testing.T) {
 }
 
 func TestTracker(t *testing.T) {
-	tracker := server.NewHttpTracker()
+	tr := tracker.NewHttpTracker()
 
-	s := httptest.NewServer(tracker)
-
-	//go server.Start(":9090")
+	s := httptest.NewServer(tr)
 
 	time.Sleep(time.Millisecond * 10)
 
-	c := client.New(s.URL)
+	c := tracker.NewClient(s.URL)
 	c.Register("doc2", "peer1")
 
 	peers := c.Get("doc2")

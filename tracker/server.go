@@ -1,15 +1,16 @@
-package server
+package tracker
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/ajiku17/CollaborativeTextEditor/tracker/table"
 	"net/http"
 )
 
 type HttpTracker struct {
-	Table *table.Table
+	Table *Table
+
+	serveMux http.ServeMux
 }
 
 func (t *HttpTracker) registerHandler(w http.ResponseWriter, r *http.Request) {
@@ -21,9 +22,9 @@ func (t *HttpTracker) registerHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	addr, ok := arguments["addr"]
+	addr, ok := arguments["peerid"]
 	if !ok || len(addr) < 1 {
-		http.Error(w, errors.New("must provide address 'addr'").Error(), http.StatusPreconditionFailed)
+		http.Error(w, errors.New("must provide peer id 'peerid'").Error(), http.StatusPreconditionFailed)
 		return
 	}
 
@@ -57,20 +58,19 @@ func (t *HttpTracker) getHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (t *HttpTracker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	switch r.URL.Path  {
-	case "/get":
-		t.getHandler(w, r)
-	case "/register":
-		t.registerHandler(w, r)
-	}
-}
-
 func NewHttpTracker() *HttpTracker {
 	t := new(HttpTracker)
 
-	t.Table = table.New()
+	t.Table = NewTable()
+
+	t.serveMux.HandleFunc("/get", t.getHandler)
+	t.serveMux.HandleFunc("/register", t.registerHandler)
+
 	return t
+}
+
+func (s *HttpTracker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.serveMux.ServeHTTP(w, r)
 }
 
 func Start (port string) error {

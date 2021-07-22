@@ -1,4 +1,4 @@
-package client
+package tracker
 
 import (
 	"encoding/json"
@@ -12,7 +12,7 @@ type Client struct {
 	serverURL string
 }
 
-func New(url string) *Client {
+func NewClient(url string) *Client {
 	client := new(Client)
 	client.serverURL = url
 
@@ -20,8 +20,8 @@ func New(url string) *Client {
 }
 
 // Register registers specified address as an editor of the specified document
-func (c *Client) Register(docuemntId string, address string) {
-	_, err := http.Get(c.serverURL + "/register?doc=" + docuemntId + "&addr=" + address)
+func (c *Client) Register(docuemntId string, peerId string) {
+	_, err := http.Get(c.serverURL + "/register?doc=" + docuemntId + "&peerid=" + peerId)
 	if err != nil {
 		fmt.Printf("error occured: %v", err)
 		return

@@ -2,7 +2,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/ajiku17/CollaborativeTextEditor/tracker/server"
+	"github.com/ajiku17/CollaborativeTextEditor/tracker"
+	"net/http"
 	"os"
 )
 
@@ -15,7 +16,9 @@ func main() {
 
 	port := ":" + args[1]
 
-	err := server.Start(port)
+	tr := tracker.NewHttpTracker()
+
+	err := http.ListenAndServe(port, tr)
 	if err != nil {
 		fmt.Println("error: ", err)
 	}
