@@ -56,7 +56,10 @@ func (s *SignalingServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *SignalingServer) connectHandler(w http.ResponseWriter, r *http.Request) {
-	c, err := websocket.Accept(w, r, nil)
+	c, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+		InsecureSkipVerify:   true,
+		OriginPatterns:       []string{"*"},
+	})
 	if err != nil {
 		fmt.Printf("socket accept error %v", err)
 		return

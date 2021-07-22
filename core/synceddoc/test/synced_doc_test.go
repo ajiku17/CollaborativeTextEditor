@@ -124,52 +124,92 @@ func TestApplyRemoteOp(t *testing.T) {
 	siteId := utils.UUID("site1")
 	doc := crdt.NewBasicDocument(crdt.NewBasicPositionManager(siteId))
 
-	d.ApplyRemoteOp(siteId, crdt.OpInsert {
-		Pos: doc.InsertAtIndex("h", 0),
-		Val: "h",
-	}, nil)
+	d.ApplyRemoteOp(synceddoc.Op{
+		PeerId:      siteId,
+		PeerOpIndex: 1,
+		Cmd:         crdt.OpInsert {
+				Pos: doc.InsertAtIndex("h", 0),
+				Val: "h",
+			},
+		}, nil)
 
 	AssertTrue(t, d.ToString() == "h")
 
-	d.ApplyRemoteOp(siteId, crdt.OpInsert {
-		Pos: doc.InsertAtIndex("e", 1),
-		Val: "e",
+	d.ApplyRemoteOp(synceddoc.Op{
+		PeerId:      siteId,
+		PeerOpIndex: 2,
+		Cmd:         crdt.OpInsert {
+			Pos: doc.InsertAtIndex("e", 1),
+			Val: "e",
+		},
 	}, nil)
-	d.ApplyRemoteOp(siteId, crdt.OpInsert {
-		Pos: doc.InsertAtIndex("l", 2),
-		Val: "l",
+	d.ApplyRemoteOp(synceddoc.Op{
+		PeerId:      siteId,
+		PeerOpIndex: 3,
+		Cmd:         crdt.OpInsert {
+			Pos: doc.InsertAtIndex("l", 2),
+			Val: "l",
+		},
+	},nil)
+	d.ApplyRemoteOp(synceddoc.Op{
+		PeerId:      siteId,
+		PeerOpIndex: 4,
+		Cmd:         crdt.OpInsert {
+			Pos: doc.InsertAtIndex("l", 3),
+			Val: "l",
+		},
 	}, nil)
-	d.ApplyRemoteOp(siteId, crdt.OpInsert {
-		Pos: doc.InsertAtIndex("l", 3),
-		Val: "l",
-	}, nil)
-	d.ApplyRemoteOp(siteId, crdt.OpInsert {
-		Pos: doc.InsertAtIndex("o", 4),
-		Val: "o",
+	d.ApplyRemoteOp(synceddoc.Op{
+		PeerId:      siteId,
+		PeerOpIndex: 5,
+		Cmd:         crdt.OpInsert {
+			Pos: doc.InsertAtIndex("o", 4),
+			Val: "o",
+		},
 	}, nil)
 
 	AssertTrue(t, d.ToString() == "hello")
 
-	d.ApplyRemoteOp(siteId, crdt.OpDelete {
-		Pos: doc.DeleteAtIndex(0),
+	d.ApplyRemoteOp(synceddoc.Op{
+		PeerId:      siteId,
+		PeerOpIndex: 6,
+		Cmd:         crdt.OpDelete {
+			Pos: doc.DeleteAtIndex(0),
+		},
 	}, nil)
 
-	d.ApplyRemoteOp(siteId, crdt.OpDelete {
-		Pos: doc.DeleteAtIndex(2),
+	d.ApplyRemoteOp(synceddoc.Op{
+		PeerId:      siteId,
+		PeerOpIndex: 7,
+		Cmd:         crdt.OpDelete {
+			Pos: doc.DeleteAtIndex(2),
+		},
 	}, nil)
 
 	AssertTrue(t, d.ToString() == "elo")
 
-	d.ApplyRemoteOp(siteId, crdt.OpDelete {
-		Pos: doc.DeleteAtIndex(1),
+	d.ApplyRemoteOp(synceddoc.Op{
+		PeerId:      siteId,
+		PeerOpIndex: 8,
+		Cmd:         crdt.OpDelete {
+			Pos: doc.DeleteAtIndex(1),
+		},
 	}, nil)
 
-	d.ApplyRemoteOp(siteId, crdt.OpDelete {
-		Pos: doc.DeleteAtIndex(1),
+	d.ApplyRemoteOp(synceddoc.Op{
+		PeerId:      siteId,
+		PeerOpIndex: 9,
+		Cmd:         crdt.OpDelete {
+			Pos: doc.DeleteAtIndex(1),
+		},
 	}, nil)
 
-	d.ApplyRemoteOp(siteId, crdt.OpDelete {
-		Pos: doc.DeleteAtIndex(0),
+	d.ApplyRemoteOp(synceddoc.Op{
+		PeerId:      siteId,
+		PeerOpIndex: 10,
+		Cmd:         crdt.OpDelete {
+			Pos: doc.DeleteAtIndex(0),
+		},
 	}, nil)
 
 	AssertTrue(t, d.ToString() == "")
@@ -223,52 +263,92 @@ func TestConnectSignals(t *testing.T) {
 
 	d.ConnectSignals(onChangeTest, nil, nil)
 
-	d.ApplyRemoteOp(siteId, crdt.OpInsert {
-		Pos: doc.InsertAtIndex("h", 0),
-		Val: "h",
+	d.ApplyRemoteOp(synceddoc.Op{
+		PeerId:      siteId,
+		PeerOpIndex: 1,
+		Cmd:         crdt.OpInsert {
+				Pos: doc.InsertAtIndex("h", 0),
+				Val: "h",
+			},
 	}, &s)
 
 	AssertTrue(t, string(s) == "h")
 
-	d.ApplyRemoteOp(siteId, crdt.OpInsert {
-		Pos: doc.InsertAtIndex("e", 1),
-		Val: "e",
+	d.ApplyRemoteOp(synceddoc.Op{
+		PeerId:      siteId,
+		PeerOpIndex: 2,
+		Cmd:         crdt.OpInsert {
+				Pos: doc.InsertAtIndex("e", 1),
+				Val: "e",
+			},
 	}, &s)
-	d.ApplyRemoteOp(siteId, crdt.OpInsert {
-		Pos: doc.InsertAtIndex("l", 2),
-		Val: "l",
+	d.ApplyRemoteOp(synceddoc.Op{
+		PeerId:      siteId,
+		PeerOpIndex: 3,
+		Cmd:         crdt.OpInsert {
+				Pos: doc.InsertAtIndex("l", 2),
+				Val: "l",
+			},
 	}, &s)
-	d.ApplyRemoteOp(siteId, crdt.OpInsert {
-		Pos: doc.InsertAtIndex("l", 3),
-		Val: "l",
+	d.ApplyRemoteOp(synceddoc.Op{
+		PeerId:      siteId,
+		PeerOpIndex: 4,
+		Cmd:         crdt.OpInsert {
+				Pos: doc.InsertAtIndex("l", 3),
+				Val: "l",
+			},
 	}, &s)
-	d.ApplyRemoteOp(siteId, crdt.OpInsert {
-		Pos: doc.InsertAtIndex("o", 4),
-		Val: "o",
+	d.ApplyRemoteOp(synceddoc.Op{
+		PeerId:      siteId,
+		PeerOpIndex: 5,
+		Cmd:         crdt.OpInsert {
+				Pos: doc.InsertAtIndex("o", 4),
+				Val: "o",
+			},
 	}, &s)
 
 	AssertTrue(t, string(s) == "hello")
 
-	d.ApplyRemoteOp(siteId, crdt.OpDelete {
-		Pos: doc.DeleteAtIndex(0),
+	d.ApplyRemoteOp(synceddoc.Op{
+		PeerId:      siteId,
+		PeerOpIndex: 6,
+		Cmd:         crdt.OpDelete {
+			Pos: doc.DeleteAtIndex(0),
+		},
 	}, &s)
 
-	d.ApplyRemoteOp(siteId, crdt.OpDelete {
-		Pos: doc.DeleteAtIndex(2),
+	d.ApplyRemoteOp(synceddoc.Op{
+		PeerId:      siteId,
+		PeerOpIndex: 7,
+		Cmd:         crdt.OpDelete {
+			Pos: doc.DeleteAtIndex(2),
+		},
 	}, &s)
 
 	AssertTrue(t, string(s) == "elo")
 
-	d.ApplyRemoteOp(siteId, crdt.OpDelete {
-		Pos: doc.DeleteAtIndex(1),
+	d.ApplyRemoteOp(synceddoc.Op{
+		PeerId:      siteId,
+		PeerOpIndex: 8,
+		Cmd:         crdt.OpDelete {
+			Pos: doc.DeleteAtIndex(1),
+		},
 	}, &s)
 
-	d.ApplyRemoteOp(siteId, crdt.OpDelete {
-		Pos: doc.DeleteAtIndex(1),
+	d.ApplyRemoteOp(synceddoc.Op{
+		PeerId:      siteId,
+		PeerOpIndex: 9,
+		Cmd:         crdt.OpDelete {
+			Pos: doc.DeleteAtIndex(1),
+		},
 	}, &s)
 
-	d.ApplyRemoteOp(siteId, crdt.OpDelete {
-		Pos: doc.DeleteAtIndex(0),
+	d.ApplyRemoteOp(synceddoc.Op{
+		PeerId:      siteId,
+		PeerOpIndex: 10,
+		Cmd:         crdt.OpDelete {
+			Pos: doc.DeleteAtIndex(0),
+		},
 	}, &s)
 
 	AssertTrue(t, string(s) == "")

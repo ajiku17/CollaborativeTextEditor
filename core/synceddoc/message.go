@@ -38,3 +38,9 @@ type MessagePeerCursor struct {
 type ConnectRequest struct {
 	Id          utils.UUID
 }
+
+type Op struct {
+	PeerId      utils.UUID
+	PeerOpIndex int
+	Cmd         interface{}
+}

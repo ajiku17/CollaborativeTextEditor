@@ -125,7 +125,7 @@ func (p *PeerConn) handleSignals(msgQueue chan interface{}) {
 				p.onConnAnswerCallback(msg.(ConnAnswer))
 			}
 		case <- timer:
-			//fmt.Println("peer conn timer fired off")
+			//fmt.Println("peer signal timer fired off")
 			continue
 		}
 	}

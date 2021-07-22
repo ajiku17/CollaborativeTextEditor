@@ -92,24 +92,31 @@ func TestTracker(t *testing.T) {
 	time.Sleep(time.Millisecond * 10)
 
 	c := tracker.NewClient(s.URL)
-	c.Register("doc2", "peer1")
+	err := c.Register("doc2", "peer1")
+	AssertTrue(t, err == nil)
 
-	peers := c.Get("doc2")
+	peers, err := c.Get("doc2")
+	AssertTrue(t, err == nil)
 	AssertTrue(t, len(peers) == 1)
 	AssertTrue(t, peers[0] == "peer1")
 
-	peers = c.Get("doc1")
+	peers, err = c.Get("doc1")
+	AssertTrue(t, err == nil)
 	AssertTrue(t, len(peers) == 0)
 
-	c.Register("doc3", "peer3")
+	err = c.Register("doc3", "peer3")
+	AssertTrue(t, err == nil)
 
-	peers = c.Get("doc3")
+	peers, err = c.Get("doc3")
+	AssertTrue(t, err == nil)
 	AssertTrue(t, len(peers) == 1)
 	AssertTrue(t, peers[0] == "peer3")
 
-	c.Register("doc2", "peer3")
+	err = c.Register("doc2", "peer3")
+	AssertTrue(t, err == nil)
 
-	peers = c.Get("doc2")
+	peers, err = c.Get("doc2")
+	AssertTrue(t, err == nil)
 	AssertTrue(t, len(peers) == 2)
 	AssertTrue(t, peers[0] == "peer1")
 	AssertTrue(t, peers[1] == "peer3")

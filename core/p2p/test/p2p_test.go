@@ -27,13 +27,10 @@ func TestConnect(t *testing.T) {
 	url, closeFn := setupTest(t)
 	defer closeFn()
 
-	applyCh1 := make(chan p2p.ApplyMsg, 100)
-	applyCh2 := make(chan p2p.ApplyMsg, 100)
-
-	p1 := p2p.New(url, "sandro", STUN_URL, applyCh1)
+	p1 := p2p.New(url, "sandro", STUN_URL)
 	defer p1.Stop()
 
-	p2 := p2p.New(url, "tamo", STUN_URL, applyCh2)
+	p2 := p2p.New(url, "tamo", STUN_URL)
 	defer p2.Stop()
 
 	connected := false
@@ -93,8 +90,7 @@ func TestMultiplePeerMessageExchange(t *testing.T) {
 
 	connectedCounter := 0
 	for i := 1; i <= nClients; i++ {
-		ch := make(chan p2p.ApplyMsg, 10)
-		p := p2p.New(url, "peer" + strconv.Itoa(i), STUN_URL, ch)
+		p := p2p.New(url, "peer" + strconv.Itoa(i), STUN_URL)
 
 		p.OnPeerConnectionRequest(func(conn *p2p.PeerConn, offer p2p.ConnOffer, aux interface{}) {
 			//fmt.Printf("%s peer connection request. endpoint: %s address: %p\n", p.GetPeerId(), conn.GetEndpoint(), conn)

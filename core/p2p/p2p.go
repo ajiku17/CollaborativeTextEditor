@@ -25,7 +25,7 @@ type P2P struct {
 	mu      sync.Mutex
 
 	stopped bool
-	conn    *signaling.Client
+	signal  *signaling.Client
 	peerId  string
 	config  webrtc.Configuration
 
@@ -35,20 +35,18 @@ type P2P struct {
 	inbound  chan []byte
 	outbound chan []byte
 
-	applyCh chan ApplyMsg
 	msgQueues map[string] chan interface{}
 }
 
-func New(signalingURL string, peerId string, stunURL string, applyCh chan ApplyMsg) *P2P {
+func New(signalingURL string, peerId string, stunURL string) *P2P {
 	c := new(P2P)
 
 	cn := signaling.NewClient(context.Background(), signalingURL, peerId)
 
 	c.stopped = false
-	c.conn = cn
+	c.signal = cn
 	c.peerConnectionCallback = nil
 	c.peerId = peerId
-	c.applyCh = applyCh
 	c.inbound = make(chan []byte, 16)
 	c.outbound = make(chan []byte, 16)
 	c.msgQueues = make(map[string] chan interface{})
@@ -76,11 +74,12 @@ func (p *P2P) OnPeerConnectionRequest(callback PeerConnectionRequestCallback) {
 }
 
 func (p *P2P) Start() error {
-	err := p.conn.Dial()
+	err := p.signal.Dial()
 	if err != nil {
 		fmt.Println("p2p signaling dial error:", err)
 		return err
 	}
+	fmt.Println("p2p signaling dial error:", err)
 
 	go p.receiver()
 	go p.sender()
@@ -109,7 +108,7 @@ func (p *P2P) receiver() {
 			return
 		}
 
-		message, err := p.conn.NextMessage()
+		message, err := p.signal.NextMessage()
 		if err != nil {
 			fmt.Println("p2p receiver error", err)
 			continue
@@ -135,7 +134,7 @@ func (p *P2P) sender() {
 		case msg := <- p.outbound:
 			//fmt.Println("p2p sending data", msg)
 
-			err := p.conn.SendPayload("peer", msg)
+			err := p.signal.SendPayload("peer", msg)
 			if err != nil {
 				fmt.Println("p2p sender error:", err)
 				continue
@@ -310,7 +309,7 @@ func (p *P2P) signalMessage(peerId string, msg P2PMessage) error {
 	if err != nil {
 		return err
 	}
-	err = p.conn.SendPayload(peerId, payload)
+	err = p.signal.SendPayload(peerId, payload)
 
 	return err
 }

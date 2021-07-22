@@ -20,12 +20,14 @@ func NewClient(url string) *Client {
 }
 
 // Register registers specified address as an editor of the specified document
-func (c *Client) Register(docuemntId string, peerId string) {
+func (c *Client) Register(docuemntId string, peerId string) error {
 	_, err := http.Get(c.serverURL + "/register?doc=" + docuemntId + "&peerid=" + peerId)
 	if err != nil {
 		fmt.Printf("error occured: %v", err)
-		return
+		return err
 	}
+
+	return nil
 }
 
 func parseGet(r io.Reader) []string {
@@ -50,12 +52,12 @@ func parseGet(r io.Reader) []string {
 }
 
 // Get retrieves a list currently connected peers
-func (c *Client) Get(docuemntId string) []string {
+func (c *Client) Get(docuemntId string) ([]string, error) {
 	rsp, err := http.Get(c.serverURL + "/get?doc=" + docuemntId)
 	if err != nil {
 		fmt.Printf("error occured: %v", err)
-		return []string{}
+		return []string{}, err
 	}
 
-	return parseGet(rsp.Body)
+	return parseGet(rsp.Body), nil
 }

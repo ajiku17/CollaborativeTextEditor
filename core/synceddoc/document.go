@@ -14,7 +14,8 @@ type ChangeListener func (changeName string, change interface {}, aux interface{
 type PeerConnectedListener func (peerId utils.UUID, cursorPosition int, aux interface{})
 type PeerDisconnectedListener func (peerId utils.UUID, aux interface{})
 
-type Op interface{}
+type DocumentState interface{}
+type Patch         interface{}
 
 type Document interface {
 	GetID() utils.UUID
@@ -48,8 +49,19 @@ type Document interface {
 	SetCursor(index int)
 
 	// ApplyRemoteOp is used from a synchronization manager to apply remote ops
-	ApplyRemoteOp(peerId utils.UUID, op Op, aux interface{})
+	ApplyRemoteOp(op Op, aux interface{})
 
+	// GetCurrentState returns current state of the document which can
+	// later be used to create patches
+	GetCurrentState() DocumentState
+
+	// CreatePatch finds diff of current document state and passed document state
+	// and generates a patch that can later be applied
+	CreatePatch(state DocumentState) Patch
+
+	// ApplyPatch applies the passed patch
+	// most importantly, apply patch is idempotent
+	ApplyPatch(patch Patch)
 	/*
 	 * Closes the document, frees resources. Document becomes non editable.
 	 */

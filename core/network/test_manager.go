@@ -10,11 +10,12 @@ import (
 )
 
 type DummyManager struct {
-	Id      utils.UUID
-	doc     synceddoc.Document
-	crdt    crdt.Document
-	stopped bool
-	mu      sync.Mutex
+	Id          utils.UUID
+	lastOpIndex int
+	doc         synceddoc.Document
+	crdt        crdt.Document
+	stopped     bool
+	mu          sync.Mutex
 }
 
 func (d *DummyManager) GetId() utils.UUID {
@@ -28,6 +29,7 @@ func (d *DummyManager) Start() {
 
 // random insert or delete ops
 func (d *DummyManager) randOp() synceddoc.Op {
+	var cmd interface{}
 	if d.crdt.Length() > 0 {
 		n := utils.RandBetween(1, 2)
 
@@ -36,24 +38,31 @@ func (d *DummyManager) randOp() synceddoc.Op {
 
 			index := utils.RandBetween(0, d.crdt.Length())
 
-			return crdt.OpInsert{
+			cmd = crdt.OpInsert{
 				Pos: d.crdt.InsertAtIndex(val, index),
 				Val: val,
 			}
 		} else {
 			index := utils.RandBetween(0, d.crdt.Length() - 1)
 
-			return crdt.OpDelete{
+			cmd = crdt.OpDelete{
 				Pos: d.crdt.DeleteAtIndex(index),
 			}
 		}
 	} else {
 		val := "a"
 
-		return crdt.OpInsert{
+		cmd = crdt.OpInsert{
 			Pos: d.crdt.InsertAtIndex(val, 0),
 			Val: val,
 		}
+	}
+
+	d.lastOpIndex++
+	return synceddoc.Op{
+		PeerId:      d.Id,
+		PeerOpIndex: d.lastOpIndex,
+		Cmd:         cmd,
 	}
 }
 
@@ -67,7 +76,7 @@ func (d *DummyManager) sync () {
 		}
 		d.mu.Unlock()
 
-		d.doc.ApplyRemoteOp(d.Id, d.randOp(), nil)
+		d.doc.ApplyRemoteOp(d.randOp(), nil)
 		time.Sleep(2 * time.Second)
 	}
 }
