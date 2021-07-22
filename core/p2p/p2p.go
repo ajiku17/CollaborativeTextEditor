@@ -63,6 +63,10 @@ func New(signalingURL string, peerId string, stunURL string, applyCh chan ApplyM
 	return c
 }
 
+func (p *P2P) GetPeerId() string {
+	return p.peerId
+}
+
 func (p *P2P) OnPeerConnection(callback PeerConnectionCallback) {
 	p.peerConnectionCallback = callback
 }
@@ -129,7 +133,7 @@ func (p *P2P) sender() {
 
 		select {
 		case msg := <- p.outbound:
-			fmt.Println("p2p sending data", msg)
+			//fmt.Println("p2p sending data", msg)
 
 			err := p.conn.SendPayload("peer", msg)
 			if err != nil {
@@ -163,7 +167,7 @@ func (p *P2P) processMsg(msg []byte) error {
 		return err
 	}
 
-	fmt.Println(p.peerId, "received message", m)
+	//fmt.Println(p.peerId, "received message", m)
 	switch m.MsgType {
 	case CONN_OFFER:
 		offer := ConnOffer{}
@@ -172,22 +176,22 @@ func (p *P2P) processMsg(msg []byte) error {
 			fmt.Println("invalid ConnOffer", m.Msg)
 			return err
 		}
-		fmt.Println(p.peerId, "received offer", offer)
+		//fmt.Println(p.peerId, "received offer", offer)
 		go p.connectionRequested(offer)
 	case CONN_ANSWER:
 		answer := ConnAnswer{}
 		err := json.Unmarshal(m.Msg, &answer)
 		if err != nil {
-			fmt.Println("invalid ConnOffer", m.Msg)
+			fmt.Println("invalid ConnAnswer", m.Msg)
 			return err
 		}
 		err = p.dispatchMsg(answer.Sender, answer)
 	case ICE_CANDIDATE:
-		fmt.Println(p.peerId, "received ice candidate from signaling server")
+		//fmt.Println(p.peerId, "received ice candidate from signaling server")
 		icecandidate := ICECandidateMsg{}
 		err := json.Unmarshal(m.Msg, &icecandidate)
 		if err != nil {
-			fmt.Println("invalid ConnOffer", m.Msg)
+			fmt.Println("invalid IceCandidateMsg", m.Msg)
 			return err
 		}
 		err = p.dispatchMsg(icecandidate.Sender, icecandidate)
@@ -211,11 +215,11 @@ func (p *P2P) dispatchMsg(peerId string, msg interface{}) error {
 }
 
 func (p *P2P) DistributeMsg() {
-	fmt.Println("requesting Msg distribution")
+	//fmt.Println("requesting Msg distribution")
 }
 
 func (p *P2P) RequestSnapshot() {
-	fmt.Println("requesting snapshot")
+	//fmt.Println("requesting snapshot")
 }
 
 func (p *P2P) signalAnswer(peerId string, answer webrtc.SessionDescription) error {
@@ -355,7 +359,7 @@ func (p *P2P) setupConn(peer *PeerConn, peerId string, inboundSignals chan inter
 	})
 
 	peer.OnICECandidateReceived(func (msg ICECandidateMsg) {
-		fmt.Println("adding ice candidate in", p.peerId)
+		//fmt.Println("adding ice candidate in", p.peerId)
 		if candidateErr := peer.Conn.AddICECandidate(webrtc.ICECandidateInit{Candidate: msg.IceCandidate});
 			candidateErr != nil {
 			panic(candidateErr)
@@ -363,7 +367,7 @@ func (p *P2P) setupConn(peer *PeerConn, peerId string, inboundSignals chan inter
 	})
 
 	peer.OnAnswer(func (answer ConnAnswer) {
-		fmt.Println(p.peerId, "received answer", answer)
+		//fmt.Println(p.peerId, "received answer", answer)
 		sdp := webrtc.SessionDescription{}
 		if sdpErr := json.Unmarshal(answer.SDP, &sdp); sdpErr != nil {
 			fmt.Println("answer: invalid sdp")
@@ -387,7 +391,7 @@ func (p *P2P) setupConn(peer *PeerConn, peerId string, inboundSignals chan inter
 	// Set the handler for Peer connection state
 	// This will notify you when the peer has connected/disconnected
 	peer.Conn.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
-		fmt.Printf("%s Peer Connection State has changed: %s\n", p.peerId, s.String())
+		//fmt.Printf("%s Peer Connection State has changed: %s\n", p.peerId, s.String())
 
 		if s != webrtc.PeerConnectionStateConnected {
 			errc <- fmt.Errorf(s.String())
@@ -401,14 +405,14 @@ func (p *P2P) setupConn(peer *PeerConn, peerId string, inboundSignals chan inter
 
 	// Register channel opening handling
 	peer.Channel.OnOpen(func() {
-		fmt.Println(p.peerId, "channel opened wooo")
 		//fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", peer.Channel.Label(), peer.Channel.ID())
 		errc <- nil
 	})
 
 	// Register text message handling
 	peer.Channel.OnMessage(func(msg webrtc.DataChannelMessage) {
-		fmt.Printf("%s Message from DataChannel '%s': '%s'\n", peer.endpointId, peer.Channel.Label(), string(msg.Data))
+		//fmt.Printf("%s %s Message from DataChannel '%s': '%s'\n", p.peerId, peer.endpointId, peer.Channel.Label(), string(msg.Data))
+		//fmt.Printf("%s calling message callback %p\n", p.peerId, peer.OnMessageCallback)
 		peer.OnMessageCallback(msg.Data)
 	})
 
@@ -433,7 +437,6 @@ func (p *P2P) setupConn(peer *PeerConn, peerId string, inboundSignals chan inter
 
 	// Block while an error hasn't occurred
 	err = <- errc
-	fmt.Println("peer ", peer, "error", err)
 	if err != nil {
 		return fmt.Errorf("could not establish connection: %s", err)
 	}
@@ -482,7 +485,7 @@ func (p *P2P) connectionRequested (offer ConnOffer) {
 	})
 
 	peer.OnICECandidateReceived(func (candidate ICECandidateMsg) {
-		fmt.Println("adding ice candidate in answer")
+		//fmt.Println("adding ice candidate in answer")
 		if candidateErr := peer.Conn.AddICECandidate(webrtc.ICECandidateInit{Candidate: candidate.IceCandidate}); candidateErr != nil {
 			panic(candidateErr)
 		}
@@ -491,7 +494,7 @@ func (p *P2P) connectionRequested (offer ConnOffer) {
 	// Set the handler for Peer connection state
 	// This will notify you when the peer has connected/disconnected
 	peer.Conn.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
-		fmt.Printf("%s Peer Connection State has changed: %s\n", p.peerId, s.String())
+		//fmt.Printf("%s Peer Connection State has changed: %s\n", p.peerId, s.String())
 
 		if s != webrtc.PeerConnectionStateConnected {
 			errc <- fmt.Errorf(s.String())
@@ -502,23 +505,11 @@ func (p *P2P) connectionRequested (offer ConnOffer) {
 		peer.Channel = d
 
 		d.OnOpen(func() {
-			fmt.Println(p.peerId, "channel opened wooo")
 			errc <- nil
-
-			for range time.NewTicker(5 * time.Second).C {
-				message := "Hello world"
-				fmt.Printf("Sending '%s'\n", message)
-
-				// Send the message as text
-				sendTextErr := d.SendText(message)
-				if sendTextErr != nil {
-					panic(sendTextErr)
-				}
-			}
 		})
 
 		d.OnMessage(func(msg webrtc.DataChannelMessage) {
-			fmt.Printf("%s Message from DataChannel '%s': '%s'\n", peer.endpointId, peer.Channel.Label(), string(msg.Data))
+			//fmt.Printf("%s %s Message from DataChannel '%s': '%s'\n", p.peerId, peer.endpointId, peer.Channel.Label(), string(msg.Data))
 			if peer.OnMessageCallback != nil {
 				peer.OnMessageCallback(msg.Data)
 			}

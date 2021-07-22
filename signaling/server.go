@@ -154,7 +154,7 @@ func (s *SignalingServer) processRequest(ctx context.Context, cl client, rqs []b
 			return nil, fmt.Errorf("failed to send peer data {%v}", err)
 		}
 	} else if msg.MsgType == MESSAGE_FORWARD {
-		fmt.Println("request processor: sending ", msg.Msg, "to", msg.Receiver)
+		//fmt.Println("request processor: sending ", msg.Msg, "to", msg.Receiver)
 		s.sendMessageToPeer(msg.Receiver, msg.Msg)
 	} else {
 		return nil, fmt.Errorf("unsuported message type")
@@ -180,7 +180,7 @@ func (s *client) receiver(ctx context.Context, errc chan error) {
 		if errors.Is(err, context.Canceled) ||
 			errors.Is(err, context.DeadlineExceeded) ||
 			websocket.CloseStatus(err) == websocket.StatusUnsupportedData {
-			fmt.Println("receiver continue; error", err)
+			//fmt.Println("receiver continue; error", err)
 			continue
 		}
 

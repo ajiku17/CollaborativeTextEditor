@@ -201,7 +201,6 @@ func randString(n int) string {
 		extra := n - len(s)
 		return s + strings.Repeat("=", extra)
 	}
-	return "hello"
 	return s
 }
 

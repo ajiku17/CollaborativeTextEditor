@@ -1,7 +1,6 @@
 package p2p
 
 import (
-	"fmt"
 	"github.com/pion/webrtc/v3"
 	"sync"
 	"time"
@@ -33,7 +32,6 @@ type PeerConn struct {
 	onConnAnswerCallback   ConnAnswerCallback
 }
 
-
 func NewConn(endpoint string) *PeerConn {
 	p := new(PeerConn)
 
@@ -41,6 +39,10 @@ func NewConn(endpoint string) *PeerConn {
 	p.terminated = false
 
 	return p
+}
+
+func (p *PeerConn) GetEndpoint() string {
+	return p.endpointId
 }
 
 func (p *PeerConn) OnICECandidateReceived(callback ICECandidateCallback) {
@@ -62,7 +64,7 @@ func (p *PeerConn) OnChannelCreate(fn func ()) {
 
 			for range time.NewTicker(5 * time.Second).C {
 				message := "Hello world"
-				fmt.Printf("Sending '%s'\n", message)
+				//fmt.Printf("Sending '%s'\n", message)
 
 				// Send the message as text
 				sendTextErr := d.SendText(message)
@@ -73,7 +75,7 @@ func (p *PeerConn) OnChannelCreate(fn func ()) {
 		})
 		
 		d.OnMessage(func(msg webrtc.DataChannelMessage) {
-			fmt.Printf("%s Message from DataChannel '%s': '%s'\n", p.endpointId, p.Channel.Label(), string(msg.Data))
+			//fmt.Printf("%s Message from DataChannel '%s': '%s'\n", p.endpointId, p.Channel.Label(), string(msg.Data))
 			p.OnMessageCallback(msg.Data)
 		})
 	})
@@ -85,7 +87,7 @@ func (p *PeerConn) OnMessage(callback MessageCallback) {
 
 func (p *PeerConn) Close() error {
 	if err := p.Conn.Close(); err != nil {
-		fmt.Printf("cannot close peer.Conn: %v\n", err)
+		//fmt.Printf("cannot close peer.Conn: %v\n", err)
 		return err
 	}
 
@@ -112,18 +114,18 @@ func (p *PeerConn) handleSignals(msgQueue chan interface{}) {
 
 		select {
 		case msg := <- msgQueue:
-			fmt.Println("p2p received data", msg, "from", p.endpointId)
+			//fmt.Println("p2p received data", msg, "from", p.endpointId)
 
 			switch msg.(type) {
 			case ICECandidateMsg:
-				fmt.Println("received ice candidate message", msg)
+				//fmt.Println("received ice candidate message", msg)
 				p.onICECandidateCallback(msg.(ICECandidateMsg))
 			case ConnAnswer:
-				fmt.Println("received answer", msg)
+				//fmt.Println("received answer", msg)
 				p.onConnAnswerCallback(msg.(ConnAnswer))
 			}
 		case <- timer:
-			fmt.Println("peer conn timer fired off")
+			//fmt.Println("peer conn timer fired off")
 			continue
 		}
 	}
