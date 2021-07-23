@@ -9,8 +9,11 @@ import (
 type P2PMessage struct {
 	Sender   string
 	Receiver string
+	Data     []byte
 	IsPatch  bool
 	Patch    synceddoc.Patch
+	IsState  bool
+	State    synceddoc.DocumentState
 }
 
 func EncodeP2PMessage(msg P2PMessage) ([]byte, error) {

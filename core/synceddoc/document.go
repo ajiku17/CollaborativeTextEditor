@@ -51,17 +51,20 @@ type Document interface {
 	// ApplyRemoteOp is used from a synchronization manager to apply remote ops
 	ApplyRemoteOp(op Op, aux interface{})
 
-	// GetCurrentState returns current state of the document which can
+	// GetCurrentState returns current State of the document which can
 	// later be used to create patches
 	GetCurrentState() DocumentState
 
-	// CreatePatch finds diff of current document state and passed document state
-	// and generates a patch that can later be applied
+	// CreatePatch finds diff of current document State and passed document State
+	// and generates a Patch that can later be applied
 	CreatePatch(state DocumentState) Patch
 
-	// ApplyPatch applies the passed patch
-	// most importantly, apply patch is idempotent
+	// ApplyPatch applies the passed Patch
+	// most importantly, apply Patch is idempotent
 	ApplyPatch(patch Patch)
+
+	GetLocalOpsFrom(index int) ([]Op, int)
+
 	/*
 	 * Closes the document, frees resources. Document becomes non editable.
 	 */

@@ -77,7 +77,7 @@ func (s *SignalingServer) connectHandler(w http.ResponseWriter, r *http.Request)
 	err = s.connect(c, r.Context(), peerId)
 	if err != nil {
 		if websocket.CloseStatus(err) != websocket.StatusNormalClosure {
-			fmt.Printf("subscribeHandler error: %v\n", err)
+			fmt.Printf("handler error: %v\n", err)
 		}
 		return
 	}
@@ -131,8 +131,10 @@ func (s *SignalingServer) processRequest(ctx context.Context, cl client, rqs []b
 
 	msg := SignalMessage{}
 
+	//fmt.Println("request processor processing rqs from", cl.peerId, rqs)
 	err := dec.Decode(&msg)
 	if err != nil {
+		fmt.Println("request processor decode error from", cl.peerId, ":", err)
 		return nil, err
 	}
 
@@ -224,7 +226,7 @@ func writeTimeout (ctx context.Context, timeout time.Duration, c *websocket.Conn
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	return c.Write(ctx, websocket.MessageText, msg)
+	return c.Write(ctx, websocket.MessageBinary, msg)
 }
 
 func readTimeout(ctx context.Context, timeout time.Duration, c *websocket.Conn) ([]byte, error) {
@@ -237,7 +239,7 @@ func readTimeout(ctx context.Context, timeout time.Duration, c *websocket.Conn) 
 		return nil, err
 	}
 
-	if typ != websocket.MessageText {
+	if typ != websocket.MessageBinary {
 		c.Close(websocket.StatusUnsupportedData, "expected text data")
 		return nil, fmt.Errorf("expected text message but got %v", typ)
 	}
@@ -252,7 +254,7 @@ func read(ctx context.Context, c *websocket.Conn) ([]byte, error) {
 		return nil, err
 	}
 
-	if typ != websocket.MessageText {
+	if typ != websocket.MessageBinary {
 		c.Close(websocket.StatusUnsupportedData, "expected text data")
 		return nil, fmt.Errorf("expected text message but got %v", typ)
 	}

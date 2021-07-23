@@ -1,6 +1,8 @@
 package synceddoc
 
 import (
+	"bytes"
+	"encoding/gob"
 	"github.com/ajiku17/CollaborativeTextEditor/core/crdt"
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
 )
@@ -43,4 +45,29 @@ type Op struct {
 	PeerId      utils.UUID
 	PeerOpIndex int
 	Cmd         interface{}
+}
+
+func EncodeOp(msg Op) ([]byte, error) {
+	w := new(bytes.Buffer)
+	e := gob.NewEncoder(w)
+
+	err := e.Encode(msg)
+	if err != nil {
+		return nil, err
+	}
+
+	return w.Bytes(), nil
+}
+
+func DecodeOp(msg []byte) (Op, error) {
+	r := bytes.NewBuffer(msg)
+	d := gob.NewDecoder(r)
+
+	res := Op{}
+	err := d.Decode(&res)
+	if err != nil {
+		return Op{}, err
+	}
+
+	return res, nil
 }

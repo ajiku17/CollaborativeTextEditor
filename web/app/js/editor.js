@@ -27,7 +27,8 @@ function enableEditor() {
     editor.options.readOnly = false
 }
 
-function documentLoaded(docId) {
+function documentLoaded(documentId) {
+    docId = documentId
     pushState(docId)
     enableEditor()
 }
@@ -78,10 +79,10 @@ function onCursorActivity(editor) {
 }
 
 function onDocChange(changeName, changeObj) {
-    console.log("received change with name ", changeName, " and change obj ", changeObj)
+    // console.log("received change with name ", changeName, " and change obj ", changeObj)
     switch (changeObj.changeName) {
         case "insert":
-            console.log("calling insert")
+            // console.log("calling insert")
             editor.getDoc().replaceRange(changeObj.value,
                 editor.getDoc().posFromIndex(changeObj.index),
                 editor.getDoc().posFromIndex(changeObj.index),
@@ -90,9 +91,10 @@ function onDocChange(changeName, changeObj) {
             break
 
         case "delete":
+            // console.log("calling delete")
             editor.getDoc().replaceRange("",
                 editor.getDoc().posFromIndex(changeObj.index),
-                editor.getDoc().posFromIndex(changeObj.index) + 1)
+                editor.getDoc().posFromIndex(changeObj.index + 1))
 
             break
 
@@ -121,8 +123,7 @@ function popState() {
 
 function openNewDoc() {
     editor.setValue("")
-    docId = DocumentNew(onDocChange, onPeerConnect, onPeerDisconnect)
-    documentLoaded(docId)
+    DocumentNew(onDocChange, onPeerConnect, onPeerDisconnect, documentLoaded)
 }
 
 function saveLocal() {
@@ -131,9 +132,7 @@ function saveLocal() {
 }
 
 function openDocById(id) {
-    docId = DocumentOpen(id, initCallback, onDocChange, onPeerConnect, onPeerDisconnect)
-    console.log("docid", docId)
-    documentLoaded(docId)
+    DocumentOpen(id, initCallback, onDocChange, onPeerConnect, onPeerDisconnect, documentLoaded)
 }
 
 function closeDoc() {
@@ -174,8 +173,7 @@ inputElement.onchange = (e) => {
         const textContent = e.target.result
         docId = DocumentDeserialize(Uint8Array.from(textContent.split(",").map(function (item) {
             return parseInt(item, 10)
-        })), initCallback, onDocChange, onPeerConnect, onPeerDisconnect)
-        documentLoaded(docId)
+        })), initCallback, onDocChange, onPeerConnect, onPeerDisconnect, documentLoaded)
     }
     reader.onerror = (e) => {
         const error = e.target.error
@@ -185,6 +183,7 @@ inputElement.onchange = (e) => {
 }
 
 function parseReq () {
+    console.log("parsing request")
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString)
 
@@ -201,10 +200,15 @@ function initJS() {
     disableButtons()
     disableEditor()
 
-    // parseReq()
+    setTimeout(function () {
+        parseReq()
+    }, 5000)
 
     console.log("disabling editor")
     enableButtons()
 }
 
+// run()
 initJS()
+
+// setTimeout(parseReq, 3000)

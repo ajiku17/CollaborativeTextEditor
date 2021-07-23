@@ -601,3 +601,81 @@ func TestOverlappingPatchApply(t *testing.T) {
 	AssertTrue(t, d1.ToString() == d2.ToString())
 }
 
+func TestLocalOpsFrom(t *testing.T) {
+	d1 := synceddoc.New("1")
+	lastLocalOpIndex := 3
+
+	var lastIndex1, lastIndex2 int
+	var newLastIndex1, newLastIndex2 int
+
+	d1.LocalInsert(0, "h")
+	d1.LocalInsert(1, "e")
+	d1.LocalInsert(2, "l")
+	d1.LocalInsert(3, "o")
+	d1.LocalInsert(4, "w")
+	d1.LocalInsert(5, "o")
+	d1.LocalInsert(6, "r")
+	d1.LocalInsert(7, "l")
+	d1.LocalInsert(8, "d")
+	d1.LocalInsert(3, "l")
+	d1.LocalInsert(5, " ")
+
+	localOps1, lastIndex1 := d1.GetLocalOpsFrom(lastLocalOpIndex)
+
+	AssertTrue(t, lastIndex1 == len(d1.ToString()) - 1)
+
+	d2, err := synceddoc.Open("2", string(d1.GetID()))
+	AssertTrue(t, err == nil)
+
+	d2.LocalInsert(0, "b")
+	d2.LocalInsert(1, "a")
+	d2.LocalInsert(2, "d")
+	d2.LocalInsert(3, "o")
+	d2.LocalInsert(4, "R")
+	d2.LocalInsert(5, "o")
+	d2.LocalInsert(6, "q")
+	d2.LocalInsert(7, "l")
+	d2.LocalInsert(8, "d")
+	d2.LocalInsert(3, "p")
+	d2.LocalInsert(5, " ")
+
+	fmt.Println(d1.ToString())
+	fmt.Println(d2.ToString())
+
+	localOps2, lastIndex2 := d2.GetLocalOpsFrom(lastLocalOpIndex)
+
+	fmt.Println(lastIndex1, lastIndex2, len(d2.ToString()))
+	AssertTrue(t, lastIndex2 == len(d2.ToString()) - 1)
+
+	d1State := d1.GetCurrentState()
+	d2State := d2.GetCurrentState()
+
+	d1Patch := d2.CreatePatch(d1State)
+
+	d1.ApplyPatch(d1Patch)
+
+	newLocalOps1, newLastIndex1 := d1.GetLocalOpsFrom(lastLocalOpIndex)
+
+	AssertTrue(t, lastIndex1 == newLastIndex1)
+	AssertTrue(t, reflect.DeepEqual(newLocalOps1, localOps1))
+
+	// add modifications to the document
+	d1.LocalInsert(8, "a")
+	d1.LocalInsert(3, "b")
+	d1.LocalInsert(5, "c")
+
+	d2Patch := d1.CreatePatch(d2State)
+
+	d2.ApplyPatch(d2Patch)
+
+	newLocalOps2, newLastIndex2 := d2.GetLocalOpsFrom(lastLocalOpIndex)
+
+	AssertTrue(t, lastIndex2 == newLastIndex2)
+	AssertTrue(t, reflect.DeepEqual(newLocalOps2, localOps2))
+
+	AssertTrue(t, d1.GetID() == d2.GetID())
+	fmt.Println(d1.ToString())
+	fmt.Println(d2.ToString())
+	AssertTrue(t, d1.ToString() == d2.ToString())
+}
+

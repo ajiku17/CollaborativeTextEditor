@@ -14,6 +14,10 @@ type ConnAnswer struct {
 	SDP    []byte `json:"sdp"`
 }
 
+type ConnRefuse struct {
+	Sender string `json:"sender"`
+}
+
 type ICECandidateMsg struct {
 	Sender       string `json:"sender"`
 	IceCandidate string `json:"ice_candidate"`

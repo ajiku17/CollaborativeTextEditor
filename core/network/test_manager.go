@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/ajiku17/CollaborativeTextEditor/core/crdt"
 	"github.com/ajiku17/CollaborativeTextEditor/core/synceddoc"
+	"github.com/ajiku17/CollaborativeTextEditor/tracker"
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
 	"sync"
 	"time"
@@ -24,6 +25,13 @@ func (d *DummyManager) GetId() utils.UUID {
 
 func (d *DummyManager) Start() {
 	fmt.Println("starting manager")
+
+	client := tracker.NewClient("http://127.0.0.1:9090")
+
+	fmt.Println("your id", d.Id)
+	client.Register("dokydok", string(d.Id))
+	get, _ := client.Get("dokydok")
+	fmt.Println("get peers", get)
 	go d.sync()
 }
 

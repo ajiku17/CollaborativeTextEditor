@@ -30,6 +30,16 @@ func (c *Client) Register(docuemntId string, peerId string) error {
 	return nil
 }
 
+func (c *Client) RegisterAndGet(docuemntId string, peerId string) ([]string, error) {
+	rsp, err := http.Get(c.serverURL + "/register-get?doc=" + docuemntId + "&peerid=" + peerId)
+	if err != nil {
+		fmt.Printf("error occured: %v", err)
+		return []string{}, err
+	}
+
+	return parseGet(rsp.Body), nil
+}
+
 func parseGet(r io.Reader) []string {
 	peerList := make([]string, 0)
 

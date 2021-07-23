@@ -21,7 +21,7 @@ type P2PManager struct {
 
 	signalingURL string
 
-	trackerC tracker.Client
+	trackerC *tracker.Client
 
 	conns   map[*p2p.PeerConn]struct{}
 	connsMu sync.Mutex
@@ -33,7 +33,7 @@ type P2PManager struct {
 	mu sync.Mutex
 }
 
-func New (siteId utils.UUID, doc synceddoc.Document, signalingURL string, track tracker.Client) Manager {
+func NewP2PManager(siteId utils.UUID, doc synceddoc.Document, signalingURL string, track *tracker.Client) Manager {
 	m := new(P2PManager)
 
 	m.id = siteId
@@ -58,20 +58,20 @@ func (m *P2PManager) GetId() utils.UUID {
 func (m *P2PManager) Start() {
 	m.p2p = p2p.New(m.signalingURL, string(m.id), STUN_URL)
 
-	err := m.trackerC.Register(string(m.doc.GetID()), string(m.id))
+	peers, err := m.trackerC.RegisterAndGet(string(m.doc.GetID()), string(m.id))
 	if err != nil {
-		fmt.Println("P2P manager: error registering with tracker", err)
+		fmt.Println("P2P manager: error registering and getting from tracker", err)
 	}
 
-	peers, err := m.trackerC.Get(string(m.doc.GetID()))
+	peers, err = m.trackerC.Get(string(m.doc.GetID()))
 	if err != nil {
-		fmt.Println("P2P manager: error fetching peer list from tracker", err)
+		fmt.Println("P2P manager: error registering and getting from tracker", err)
 	}
 
 	// Setup p2p
 	m.p2p.OnPeerConnectionRequest(func(conn *p2p.PeerConn, offer p2p.ConnOffer, aux interface{}) {
 		conn.OnMessage(func (msg []byte) {
-			fmt.Printf("%s received a message from %s %s\n", m.p2p.GetPeerId(), conn.GetEndpoint(), string(msg))
+			//fmt.Printf("%s received a message from %s %s\n", m.p2p.GetPeerId(), conn.GetEndpoint(), string(msg))
 			p2pMsg, err := DecodeP2PMessage(msg)
 			if err == nil {
 				m.inbound <- p2pMsg
@@ -93,23 +93,30 @@ func (m *P2PManager) Start() {
 		fmt.Println("P2P manager: error starting p2p", err)
 	}
 
+	fmt.Println(m.id, "received peer ids", peers)
+
 	// Setup connections
-	wg := sync.WaitGroup{}
+	//wg := sync.WaitGroup{}
 	for _, p := range peers {
-		wg.Add(1)
+		if string(m.id) == p {
+			continue
+		}
+
+		//wg.Add(1)
 		go func (peerId string) {
 			conn := p2p.NewConn(peerId)
 
 			conn.OnMessage(func(msg []byte) {
-				fmt.Printf("%s received a message from %s %s\n", m.p2p.GetPeerId(), conn.GetEndpoint(), string(msg))
+				//fmt.Printf("%s received a message from %s %s\n", m.p2p.GetPeerId(), conn.GetEndpoint(), string(msg))
 				p2pMsg, err := DecodeP2PMessage(msg)
 				if err == nil {
 					m.inbound <- p2pMsg
 				}
 			})
 
+			//fmt.Println(m.id, "manager setting up connection with", conn.GetEndpoint())
 			err := m.p2p.SetupConn(conn, conn.GetEndpoint())
-			wg.Done()
+			//wg.Done()
 
 			if err != nil {
 				fmt.Println("P2P manager: error while setting up connection with", conn.GetEndpoint())
@@ -122,15 +129,85 @@ func (m *P2PManager) Start() {
 		} (p)
 	}
 
+
 	// wait for connections
-	wg.Wait()
+	//wg.Wait()
 
 	go m.synchronizer()
 }
 
 func (m *P2PManager) synchronizer() {
+	go m.changeMonitor()
 	go m.sender()
 	go m.requestProcessor()
+	go m.backgroundSync()
+}
+
+func (m *P2PManager) backgroundSync() {
+	for {
+		var killed bool
+		m.mu.Lock()
+		killed = m.killed
+		m.mu.Unlock()
+
+		if killed {
+			fmt.Println(m.id, "background sync has been killed")
+			return
+		}
+
+		docState := m.doc.GetCurrentState()
+		m.outbound <- P2PMessage{
+			Sender:   string(m.id),
+			Receiver: "",
+			Data:     nil,
+			IsPatch:  false,
+			Patch:    nil,
+			IsState:  true,
+			State:    docState,
+		}
+
+		time.Sleep(5 * time.Second) // sleep for a while
+	}
+}
+
+func (m *P2PManager) changeMonitor() {
+	lastChangeIndex := 0
+
+	for {
+		var killed bool
+		m.mu.Lock()
+		killed = m.killed
+		m.mu.Unlock()
+
+		if killed {
+			fmt.Println(m.id, "change monitor has been killed")
+			return
+		}
+
+		changesAfter, ind := m.doc.GetLocalOpsFrom(lastChangeIndex)
+		lastChangeIndex = ind
+
+		for _, op := range changesAfter {
+			opData, err := synceddoc.EncodeOp(op)
+			if err != nil {
+				fmt.Println("failed to encode Op")
+				continue
+			}
+
+			//fmt.Println(m.id, "sending op", op, "to")
+			m.outbound <- P2PMessage{
+				Sender:   string(m.id),
+				Receiver: "",
+				Data:     opData,
+				IsPatch:  false,
+				Patch:    nil,
+				IsState:  false,
+				State:    nil,
+			}
+		}
+
+		time.Sleep(500 * time.Millisecond)
+	}
 }
 
 func (m *P2PManager) sender () {
@@ -149,28 +226,52 @@ func (m *P2PManager) sender () {
 
 		select {
 		case msg := <- m.outbound:
-			m.connsMu.Lock()
-			for conn := range m.conns {
-				go func(conn* p2p.PeerConn, p2pMsg P2PMessage) {
-					byteMsg, err := EncodeP2PMessage(p2pMsg)
-					if err != nil {
-						fmt.Println(m.id, "sender error: failed to encode msg", p2pMsg)
-						return
-					}
-
-					err = conn.SendMessage(byteMsg)
-					if err != nil {
-						fmt.Println(m.id, "sender error: failed to send msg to", conn.GetEndpoint())
-						return
-					}
-
-				}(conn, msg)
+			if msg.Receiver == "" {
+				m.sendToAll(msg)
+			} else {
+				m.sendToPeer(msg.Receiver, msg)
 			}
-			fmt.Println(msg)
-			m.connsMu.Unlock()
+
 		case <- timer:
 			fmt.Println(m.id, "sender timer fired off")
 		}
+	}
+}
+
+func (m *P2PManager) sendToAll(msg P2PMessage) {
+	//fmt.Println(m.id, "trying to send")
+	m.connsMu.Lock()
+	defer m.connsMu.Unlock()
+	//fmt.Println(m.id, "took lock to send", m.conns)
+	for conn := range m.conns {
+		//fmt.Println(m.id, "sending to", conn.GetEndpoint())
+		go m.sendToConn(conn, msg)
+	}
+}
+
+func (m *P2PManager) sendToPeer(peerId string, msg P2PMessage) {
+	//fmt.Println(m.id, "trying to send")
+	m.connsMu.Lock()
+	defer m.connsMu.Unlock()
+	//fmt.Println(m.id, "took lock to send", m.conns)
+	for conn := range m.conns {
+		if conn.GetEndpoint() == peerId {
+			//fmt.Println(m.id, "sending to", conn.GetEndpoint())
+			go m.sendToConn(conn, msg)
+		}
+	}
+}
+func (m *P2PManager) sendToConn(conn *p2p.PeerConn, msg P2PMessage) {
+	byteMsg, err := EncodeP2PMessage(msg)
+	if err != nil {
+		fmt.Println(m.id, "sender error: failed to encode msg", err)
+		return
+	}
+
+	err = conn.SendMessage(byteMsg)
+	if err != nil {
+		fmt.Println(m.id, "sender error: failed to send msg to", conn.GetEndpoint(), "error:", err)
+		return
 	}
 }
 
@@ -190,10 +291,9 @@ func (m *P2PManager) requestProcessor () {
 
 		select {
 		case msg := <- m.inbound:
-			fmt.Println(msg)
 			sendRsp, response, err := m.processRequest(msg)
 			if err != nil {
-				fmt.Println(m.id, "error processing request from")
+				fmt.Println(m.id, "error processing request:", err)
 				continue
 			}
 
@@ -208,6 +308,34 @@ func (m *P2PManager) requestProcessor () {
 }
 
 func (m *P2PManager) processRequest(msg P2PMessage) (bool, P2PMessage, error) {
+	if msg.Receiver != "" && msg.Receiver != string(m.id) {
+		return false, P2PMessage{}, fmt.Errorf("%v, received somebody else's msg. receiver: %v", m.id, msg.Receiver)
+	}
+
+	if msg.IsPatch {
+		m.doc.ApplyPatch(msg.Patch)
+		return false, P2PMessage{}, nil
+	}
+
+	if msg.IsState {
+		p := m.doc.CreatePatch(msg.State)
+		return true, P2PMessage{
+			Sender:   string(m.id),
+			Receiver: msg.Sender,
+			Data:     nil,
+			IsPatch:  true,
+			Patch:    p,
+			IsState:  false,
+			State:    nil,
+		}, nil
+	}
+
+	op, err := synceddoc.DecodeOp(msg.Data)
+	if err != nil {
+		return false, P2PMessage{}, err
+	}
+
+	m.doc.ApplyRemoteOp(op, nil)
 
 	return false, P2PMessage{}, nil
 }

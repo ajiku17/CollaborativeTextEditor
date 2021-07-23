@@ -66,7 +66,7 @@ func (c *Client) NextMessage() ([]byte, error) {
 		return nil, err
 	}
 
-	if typ != websocket.MessageText {
+	if typ != websocket.MessageBinary {
 		c.c.Close(websocket.StatusUnsupportedData, "expected text data")
 		return nil, fmt.Errorf("expected text message but got %v", typ)
 	}
@@ -136,9 +136,9 @@ func (c *Client) sendData(peer string, msgType string, payload []byte) error {
 
 	toSend := w.Bytes()
 
-	//fmt.Println("sending message", toSend, "to peer", peer)
+	//fmt.Println(c.peerId, "sending message", toSend, "to peer", peer)
 
-	err = c.c.Write(context.Background(), websocket.MessageText, toSend)
+	err = c.c.Write(context.Background(), websocket.MessageBinary, toSend)
 	return err
 }
 

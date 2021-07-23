@@ -175,7 +175,7 @@ func (p *P2P) processMsg(msg []byte) error {
 			fmt.Println("invalid ConnOffer", m.Msg)
 			return err
 		}
-		//fmt.Println(p.peerId, "received offer", offer)
+		//fmt.Println(p.peerId, "received offer from ", offer.Sender)
 		go p.connectionRequested(offer)
 	case CONN_ANSWER:
 		answer := ConnAnswer{}
@@ -276,6 +276,7 @@ func (p *P2P) signalICECandidate(peerId string, c *webrtc.ICECandidate) error {
 }
 
 func (p *P2P) signalOffer(peerId string, offer webrtc.SessionDescription) error {
+	//fmt.Println(p.peerId, "sending offer to", peerId)
 	sdp, err := json.Marshal(offer)
 	if err != nil {
 		return err
@@ -317,14 +318,23 @@ func (p *P2P) signalMessage(peerId string, msg P2PMessage) error {
 func (p *P2P) SetupConn(peer *PeerConn, peerId string) error {
 	inboundSignals := make(chan interface{}, 100)
 
+	peer.endpointId = peerId
 	p.mu.Lock()
-	p.msgQueues[peerId] = inboundSignals
+	if _, ok := p.msgQueues[peer.endpointId]; ok {
+		fmt.Println(p.peerId, "refusing to setup connection to", peer.endpointId)
+		p.mu.Unlock()
+
+		return fmt.Errorf("already connected")
+	}
+
+	p.msgQueues[peer.endpointId] = inboundSignals
 	p.mu.Unlock()
 
-	return p.setupConn(peer, peerId, inboundSignals)
+	return p.setupConn(peer, peer.endpointId, inboundSignals)
 }
 
 func (p *P2P) setupConn(peer *PeerConn, peerId string, inboundSignals chan interface{}) error {
+	//fmt.Println(p.peerId, "setting up connection with", peerId)
 	peer.endpointId = peerId
 
 	errc := make(chan error, 10)
@@ -358,15 +368,17 @@ func (p *P2P) setupConn(peer *PeerConn, peerId string, inboundSignals chan inter
 	})
 
 	peer.OnICECandidateReceived(func (msg ICECandidateMsg) {
+		zeroVal := uint16(0)
+		emptyStr := ""
 		//fmt.Println("adding ice candidate in", p.peerId)
-		if candidateErr := peer.Conn.AddICECandidate(webrtc.ICECandidateInit{Candidate: msg.IceCandidate});
+		if candidateErr := peer.Conn.AddICECandidate(webrtc.ICECandidateInit{Candidate: msg.IceCandidate, SDPMid: &emptyStr, SDPMLineIndex: &zeroVal});
 			candidateErr != nil {
 			panic(candidateErr)
 		}
 	})
 
 	peer.OnAnswer(func (answer ConnAnswer) {
-		//fmt.Println(p.peerId, "received answer", answer)
+		fmt.Println(p.peerId, "received answer", answer)
 		sdp := webrtc.SessionDescription{}
 		if sdpErr := json.Unmarshal(answer.SDP, &sdp); sdpErr != nil {
 			fmt.Println("answer: invalid sdp")
@@ -415,7 +427,8 @@ func (p *P2P) setupConn(peer *PeerConn, peerId string, inboundSignals chan inter
 		peer.OnMessageCallback(msg.Data)
 	})
 
-	go peer.handleSignals(inboundSignals)
+	//fmt.Println(p.peerId, "calling handleSignals for", peer.GetEndpoint())
+	go p.handleSignals(peer, inboundSignals, errc)
 
 	// Create an offer to send to the other process
 	offer, err := peer.Conn.CreateOffer(nil)
@@ -437,19 +450,32 @@ func (p *P2P) setupConn(peer *PeerConn, peerId string, inboundSignals chan inter
 	// Block while an error hasn't occurred
 	err = <- errc
 	if err != nil {
-		return fmt.Errorf("could not establish connection: %s", err)
+		return err
 	}
 
 	return nil
 }
 
 func (p *P2P) connectionRequested (offer ConnOffer) {
+	//fmt.Println(p.peerId, "connection requested from", offer.Sender)
 	peer := NewConn(offer.Sender)
 
 	inboundSignals := make(chan interface{}, 100)
 	errc := make(chan error, 10)
 
 	p.mu.Lock()
+	if _, ok := p.msgQueues[peer.endpointId]; ok {
+		//fmt.Println(p.peerId, "refusing connection from", peer.endpointId)
+
+		if p.peerId > peer.endpointId {
+			p.mu.Unlock()
+			return
+		}
+
+		// this will terminate any connection setup currently going on
+		p.msgQueues[peer.endpointId] <- ConnRefuse{Sender: peer.endpointId}
+	}
+
 	p.msgQueues[peer.endpointId] = inboundSignals
 	p.mu.Unlock()
 
@@ -484,8 +510,10 @@ func (p *P2P) connectionRequested (offer ConnOffer) {
 	})
 
 	peer.OnICECandidateReceived(func (candidate ICECandidateMsg) {
+		zeroVal := uint16(0)
+		emptyStr := ""
 		//fmt.Println("adding ice candidate in answer")
-		if candidateErr := peer.Conn.AddICECandidate(webrtc.ICECandidateInit{Candidate: candidate.IceCandidate}); candidateErr != nil {
+		if candidateErr := peer.Conn.AddICECandidate(webrtc.ICECandidateInit{Candidate: candidate.IceCandidate, SDPMid: &emptyStr, SDPMLineIndex: &zeroVal}); candidateErr != nil {
 			panic(candidateErr)
 		}
 	})
@@ -549,7 +577,8 @@ func (p *P2P) connectionRequested (offer ConnOffer) {
 	}
 	candidatesMux.Unlock()
 
-	go peer.handleSignals(inboundSignals)
+	//fmt.Println(p.peerId, "calling handleSignals for", peer.GetEndpoint())
+	go p.handleSignals(peer, inboundSignals, errc)
 
 	err = <- errc
 

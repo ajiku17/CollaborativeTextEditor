@@ -98,6 +98,8 @@ func registerTypes() {
 	gob.Register(Op{})
 	gob.Register(Interval{})
 	gob.Register(LogEntryGob{})
+	gob.Register(SyncedDocumentState{})
+	gob.Register(SyncedDocumentPatch{})
 
 	gob.Register(ConnectRequest{})
 	gob.Register(MessageInsert{})
@@ -118,6 +120,41 @@ func setPeerConnectedListener(d *SyncedDocument, listener PeerConnectedListener)
 func setChangeListener(d *SyncedDocument, listener ChangeListener) {
 	d.onChange = listener
 }
+
+func (d *SyncedDocument) GetLocalOpsFrom(index int) ([]Op, int) {
+	res := []Op{}
+	lastIndex := 0
+
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	ops, ok := d.peerOps.Get(string(d.siteId))
+
+	if !ok {
+		return res, lastIndex
+	}
+
+	localOps := ops.(*treemap.Map)
+
+	it := localOps.Iterator()
+
+	ok = it.Last()
+	if ok {
+		lastIndex = it.Key().(int)
+		for it.Prev() {
+			ind := it.Key().(int)
+			op := it.Value().(Op)
+
+			if ind <= index {
+				break
+			}
+
+			res = append(res, op)
+		}
+	}
+	return res, lastIndex
+}
+
 
 // New creates a new, empty document
 func New(siteId string) Document {
@@ -151,6 +188,7 @@ func Load(siteId string, serializedData []byte) (Document, error) {
 	doc.id = utils.GenerateNewUUID()
 	doc.siteId = utils.UUID(siteId)
 	initDocState(doc)
+	registerTypes()
 
 	r := bytes.NewBuffer(serializedData)
 	d := gob.NewDecoder(r)
@@ -312,8 +350,6 @@ func (d *SyncedDocument) LocalInsert(index int, val string) {
 
 	pos := d.localDocument.InsertAtIndex(val, index)
 
-	d.lastLocalOpIndex++
-
 	d.addToPeerOps(Op{
 		PeerId:      d.siteId,
 		PeerOpIndex: d.lastLocalOpIndex,
@@ -322,6 +358,8 @@ func (d *SyncedDocument) LocalInsert(index int, val string) {
 			Val: val,
 		},
 	})
+
+	d.lastLocalOpIndex++
 }
 
 func (d *SyncedDocument) RemoteInsert(peerId utils.UUID, peerOpIndex int, position crdt.Position, val string, aux interface{}) bool {
@@ -347,7 +385,6 @@ func (d *SyncedDocument) LocalDelete(index int) {
 
 	pos := d.localDocument.DeleteAtIndex(index)
 
-	d.lastLocalOpIndex++
 	d.addToPeerOps(Op{
 		PeerId:      d.siteId,
 		PeerOpIndex: d.lastLocalOpIndex,
@@ -355,6 +392,8 @@ func (d *SyncedDocument) LocalDelete(index int) {
 			Pos: pos,
 		},
 	})
+
+	d.lastLocalOpIndex++
 }
 
 func (d *SyncedDocument) RemoteDelete(peerId utils.UUID, peerOpIndex int, position crdt.Position, aux interface{}) bool {
@@ -539,11 +578,11 @@ func (d *SyncedDocument) GetDocument() crdt.Document {
 
 
 type SyncedDocumentState struct {
-	state LogStateGob
+	State LogStateGob
 }
 
 type SyncedDocumentPatch struct {
-	patch map[string] []Op
+	Patch map[string] []Op
 }
 
 func (d *SyncedDocument) GetCurrentState() DocumentState {
@@ -561,7 +600,7 @@ func (d *SyncedDocument) getCurrentState() SyncedDocumentState {
 		lastEntry = d.log[len(d.log)-1]
 	}
 
-	s.state = logStateToGob(lastEntry.LogState)
+	s.State = logStateToGob(lastEntry.LogState)
 
 	return s
 }
@@ -625,14 +664,14 @@ func (d *SyncedDocument) CreatePatch(state DocumentState) Patch {
 	s := state.(SyncedDocumentState)
 	curState := d.getCurrentState()
 	p := SyncedDocumentPatch{}
-	p.patch = make(map[string] []Op)
+	p.Patch = make(map[string] []Op)
 
-	for peer, curIntervals := range curState.state {
+	for peer, curIntervals := range curState.State {
 
-		intervals, ok := s.state[peer]
+		intervals, ok := s.State[peer]
 
 		if !ok {
-			p.patch[peer] = []Op{}
+			p.Patch[peer] = []Op{}
 			m, ok := d.peerOps.Get(peer)
 			if !ok {
 				panic ("invalid peer")
@@ -645,13 +684,13 @@ func (d *SyncedDocument) CreatePatch(state DocumentState) Patch {
 					if !ok {
 						panic ("invalid op index for peer")
 					}
-					p.patch[peer] = append(p.patch[peer], op.(Op))
+					p.Patch[peer] = append(p.Patch[peer], op.(Op))
 				}
 			}
 		} else {
 			missingIndices := FindMissingIndices(intervals, curIntervals)
 			if len(missingIndices) > 0 {
-				p.patch[peer] = []Op{}
+				p.Patch[peer] = []Op{}
 				m, ok := d.peerOps.Get(peer)
 				if !ok {
 					panic ("invalid peer")
@@ -663,7 +702,7 @@ func (d *SyncedDocument) CreatePatch(state DocumentState) Patch {
 					if !ok {
 						panic ("invalid op index for peer")
 					}
-					p.patch[peer] = append(p.patch[peer], op.(Op))
+					p.Patch[peer] = append(p.Patch[peer], op.(Op))
 				}
 			}
 		}
@@ -675,7 +714,7 @@ func (d *SyncedDocument) CreatePatch(state DocumentState) Patch {
 func (d *SyncedDocument) ApplyPatch(patch Patch) {
 	p := patch.(SyncedDocumentPatch)
 
-	for _, ops := range p.patch {
+	for _, ops := range p.Patch {
 		for _, op := range ops {
 			d.ApplyRemoteOp(op, nil)
 		}
