@@ -21,12 +21,13 @@ type P2PManager struct {
 
 	signalingURL string
 
-	track  tracker.Client
+	trackerC tracker.Client
 
 	conns   map[*p2p.PeerConn]struct{}
 	connsMu sync.Mutex
 
-	inbound chan []byte
+	inbound  chan P2PMessage
+	outbound chan P2PMessage
 
 	killed bool
 	mu sync.Mutex
@@ -40,9 +41,11 @@ func New (siteId utils.UUID, doc synceddoc.Document, signalingURL string, track 
 	m.killed = false
 
 	m.signalingURL = signalingURL
-	m.track = track
+	m.trackerC = track
 
-	m.inbound = make(chan []byte, 100)
+	m.inbound = make(chan P2PMessage, 100)
+	m.outbound = make(chan P2PMessage, 100)
+
 	m.conns = make(map[*p2p.PeerConn]struct{})
 
 	return m
@@ -55,12 +58,12 @@ func (m *P2PManager) GetId() utils.UUID {
 func (m *P2PManager) Start() {
 	m.p2p = p2p.New(m.signalingURL, string(m.id), STUN_URL)
 
-	err := m.track.Register(string(m.doc.GetID()), string(m.id))
+	err := m.trackerC.Register(string(m.doc.GetID()), string(m.id))
 	if err != nil {
 		fmt.Println("P2P manager: error registering with tracker", err)
 	}
 
-	peers, err := m.track.Get(string(m.doc.GetID()))
+	peers, err := m.trackerC.Get(string(m.doc.GetID()))
 	if err != nil {
 		fmt.Println("P2P manager: error fetching peer list from tracker", err)
 	}
@@ -69,7 +72,10 @@ func (m *P2PManager) Start() {
 	m.p2p.OnPeerConnectionRequest(func(conn *p2p.PeerConn, offer p2p.ConnOffer, aux interface{}) {
 		conn.OnMessage(func (msg []byte) {
 			fmt.Printf("%s received a message from %s %s\n", m.p2p.GetPeerId(), conn.GetEndpoint(), string(msg))
-			m.inbound <- msg
+			p2pMsg, err := DecodeP2PMessage(msg)
+			if err == nil {
+				m.inbound <- p2pMsg
+			}
 		})
 	})
 
@@ -96,7 +102,10 @@ func (m *P2PManager) Start() {
 
 			conn.OnMessage(func(msg []byte) {
 				fmt.Printf("%s received a message from %s %s\n", m.p2p.GetPeerId(), conn.GetEndpoint(), string(msg))
-				m.inbound <- msg
+				p2pMsg, err := DecodeP2PMessage(msg)
+				if err == nil {
+					m.inbound <- p2pMsg
+				}
 			})
 
 			err := m.p2p.SetupConn(conn, conn.GetEndpoint())
@@ -121,7 +130,7 @@ func (m *P2PManager) Start() {
 
 func (m *P2PManager) synchronizer() {
 	go m.sender()
-	go m.receiver()
+	go m.requestProcessor()
 }
 
 func (m *P2PManager) sender () {
@@ -132,23 +141,40 @@ func (m *P2PManager) sender () {
 		m.mu.Unlock()
 
 		if killed {
-			fmt.Println(m.id, "synchronizer has been killed")
+			fmt.Println(m.id, "sender has been killed")
 			return
 		}
 
 		timer := time.After(5 * time.Second)
 
 		select {
-		case msg := <- m.inbound:
-			//m.doc.ApplyRemoteOp()
+		case msg := <- m.outbound:
+			m.connsMu.Lock()
+			for conn := range m.conns {
+				go func(conn* p2p.PeerConn, p2pMsg P2PMessage) {
+					byteMsg, err := EncodeP2PMessage(p2pMsg)
+					if err != nil {
+						fmt.Println(m.id, "sender error: failed to encode msg", p2pMsg)
+						return
+					}
+
+					err = conn.SendMessage(byteMsg)
+					if err != nil {
+						fmt.Println(m.id, "sender error: failed to send msg to", conn.GetEndpoint())
+						return
+					}
+
+				}(conn, msg)
+			}
 			fmt.Println(msg)
+			m.connsMu.Unlock()
 		case <- timer:
-			fmt.Println(m.id, "synchronizer timer fired off")
+			fmt.Println(m.id, "sender timer fired off")
 		}
 	}
 }
 
-func (m *P2PManager) receiver () {
+func (m *P2PManager) requestProcessor () {
 	for {
 		var killed bool
 		m.mu.Lock()
@@ -156,7 +182,7 @@ func (m *P2PManager) receiver () {
 		m.mu.Unlock()
 
 		if killed {
-			fmt.Println(m.id, "synchronizer has been killed")
+			fmt.Println(m.id, "receiver has been killed")
 			return
 		}
 
@@ -164,12 +190,26 @@ func (m *P2PManager) receiver () {
 
 		select {
 		case msg := <- m.inbound:
-			//m.doc.ApplyRemoteOp()
 			fmt.Println(msg)
+			sendRsp, response, err := m.processRequest(msg)
+			if err != nil {
+				fmt.Println(m.id, "error processing request from")
+				continue
+			}
+
+			if sendRsp {
+				m.outbound <- response
+			}
+
 		case <- timer:
-			fmt.Println(m.id, "synchronizer timer fired off")
+			fmt.Println(m.id, "receiver timer fired off")
 		}
 	}
+}
+
+func (m *P2PManager) processRequest(msg P2PMessage) (bool, P2PMessage, error) {
+
+	return false, P2PMessage{}, nil
 }
 
 func (m *P2PManager) Stop() {
