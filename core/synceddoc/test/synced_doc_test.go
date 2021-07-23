@@ -1,9 +1,11 @@
 package test
 
 import (
+	"fmt"
 	"github.com/ajiku17/CollaborativeTextEditor/core/crdt"
 	"github.com/ajiku17/CollaborativeTextEditor/core/synceddoc"
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
+	"reflect"
 	"testing"
 )
 
@@ -359,3 +361,243 @@ func TestConnectSignals(t *testing.T) {
 func TestSetCursor(t *testing.T) {
 
 }
+
+func TestGetIntersecting(t *testing.T) {
+	intervals := []synceddoc.Interval{{20, 35}, {50, 52}, {56, 70}, {75, 78}, {81, 83} ,{85, 90}}
+	interval := synceddoc.Interval{45, 56}
+
+	intersecting := synceddoc.GetIntersecting(interval, intervals)
+	AssertTrue(t, reflect.DeepEqual(intersecting, []synceddoc.Interval{{50, 52}, {56, 70}}))
+
+	interval = synceddoc.Interval{35, 45}
+
+	intersecting = synceddoc.GetIntersecting(interval, intervals)
+	AssertTrue(t, reflect.DeepEqual(intersecting, []synceddoc.Interval{{20, 35}}))
+
+	interval = synceddoc.Interval{36, 45}
+
+	intersecting = synceddoc.GetIntersecting(interval, intervals)
+	AssertTrue(t, len(intersecting) == 0)
+
+	interval = synceddoc.Interval{0, 100}
+
+	intersecting = synceddoc.GetIntersecting(interval, intervals)
+	AssertTrue(t, reflect.DeepEqual(intersecting, intervals))
+}
+
+func TestFindMissingIndices(t *testing.T) {
+	intervals1 := []synceddoc.Interval{{20, 35}, {50, 52}}
+	intervals2 := []synceddoc.Interval{{20, 35}, {50, 52}}
+
+	missing := synceddoc.FindMissingIndices(intervals1, intervals2)
+	fmt.Println(missing)
+	AssertTrue(t, len(missing) == 0)
+
+	intervals1 = []synceddoc.Interval{{30, 35}, {38, 50}, {58, 79}, {81, 85} ,{87, 90}}
+	intervals2 = []synceddoc.Interval{{20, 35}, {50, 52}, {56, 70}, {75, 78}, {81, 83} ,{85, 90}}
+
+	missing = synceddoc.FindMissingIndices(intervals1, intervals2)
+	fmt.Println(missing)
+	AssertTrue(t, reflect.DeepEqual(missing, []int{20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 51, 52, 56, 57, 86}))
+
+	intervals1 = []synceddoc.Interval{}
+	intervals2 = []synceddoc.Interval{{20, 21}, {50, 52}}
+
+	missing = synceddoc.FindMissingIndices(intervals1, intervals2)
+	fmt.Println(missing)
+	AssertTrue(t, reflect.DeepEqual(missing, []int{20, 21, 50, 51, 52}))
+
+	intervals1 = []synceddoc.Interval{ {1, 12},  {16, 20}}
+	intervals2 = []synceddoc.Interval{{10, 21}}
+
+	missing = synceddoc.FindMissingIndices(intervals1, intervals2)
+	fmt.Println(missing)
+	AssertTrue(t, reflect.DeepEqual(missing, []int{13, 14, 15, 21}))
+
+	intervals1 = []synceddoc.Interval{ {1, 12},  {16, 20}}
+	intervals2 = []synceddoc.Interval{{10, 21}, {50, 53}}
+
+	missing = synceddoc.FindMissingIndices(intervals1, intervals2)
+	fmt.Println(missing)
+	AssertTrue(t, reflect.DeepEqual(missing, []int{13, 14, 15, 21, 50, 51, 52, 53}))
+
+	intervals1 = []synceddoc.Interval{ {1, 12},  {16, 20}, {22, 50}}
+	intervals2 = []synceddoc.Interval{{10, 24}, {50, 53}}
+
+	missing = synceddoc.FindMissingIndices(intervals1, intervals2)
+	fmt.Println(missing)
+	AssertTrue(t, reflect.DeepEqual(missing, []int{13, 14, 15, 21, 51, 52, 53}))
+
+	intervals1 = []synceddoc.Interval{}
+	intervals2 = []synceddoc.Interval{}
+
+	missing = synceddoc.FindMissingIndices(intervals1, intervals2)
+	fmt.Println(missing)
+	AssertTrue(t, len(missing) == 0)
+
+	intervals1 = []synceddoc.Interval{{20, 21}, {50, 52}}
+	intervals2 = []synceddoc.Interval{}
+
+	missing = synceddoc.FindMissingIndices(intervals1, intervals2)
+	fmt.Println(missing)
+	AssertTrue(t, len(missing) == 0)
+}
+
+
+
+func TestCreatePatch(t *testing.T) {
+	d := synceddoc.New("1")
+
+	d.LocalInsert(0, "h")
+	d.LocalInsert(1, "e")
+	d.LocalInsert(2, "l")
+	d.LocalInsert(3, "o")
+	d.LocalInsert(4, "w")
+	d.LocalInsert(5, "o")
+	d.LocalInsert(6, "r")
+	d.LocalInsert(7, "l")
+	d.LocalInsert(8, "d")
+	d.LocalInsert(3, "l")
+	d.LocalInsert(5, " ")
+
+	AssertTrue(t, d.ToString() == "hello world")
+
+	d1, err := synceddoc.Open("2", string(d.GetID()))
+	AssertTrue(t, err == nil)
+
+	d1State := d1.GetCurrentState()
+
+	patch := d.CreatePatch(d1State)
+
+	d1.ApplyPatch(patch)
+
+	AssertTrue(t, d.GetID() == d1.GetID())
+	fmt.Println("d string:", d.ToString())
+	fmt.Println("d1 string:", d1.ToString())
+	AssertTrue(t, d.ToString() == d1.ToString())
+
+	d1.ApplyPatch(patch) // apply patch once more
+
+	AssertTrue(t, d.GetID() == d1.GetID())
+	fmt.Println("d string:", d.ToString())
+	fmt.Println("d1 string:", d1.ToString())
+	AssertTrue(t, d.ToString() == d1.ToString())
+
+	d2, err := synceddoc.Open("2", string(d.GetID()))
+	AssertTrue(t, err == nil)
+
+	d2State := d2.GetCurrentState()
+
+	patch = d1.CreatePatch(d2State)
+
+	d2.ApplyPatch(patch)
+
+	AssertTrue(t, d1.GetID() == d2.GetID())
+	fmt.Println("d1 string:", d1.ToString())
+	fmt.Println("d2 string:", d2.ToString())
+	AssertTrue(t, d1.ToString() == d2.ToString())
+}
+
+func TestPatchApply(t *testing.T) {
+	d1 := synceddoc.New("1")
+
+	d1.LocalInsert(0, "h")
+	d1.LocalInsert(1, "e")
+	d1.LocalInsert(2, "l")
+	d1.LocalInsert(3, "o")
+	d1.LocalInsert(4, "w")
+	d1.LocalInsert(5, "o")
+	d1.LocalInsert(6, "r")
+	d1.LocalInsert(7, "l")
+	d1.LocalInsert(8, "d")
+	d1.LocalInsert(3, "l")
+	d1.LocalInsert(5, " ")
+
+	d2, err := synceddoc.Open("2", string(d1.GetID()))
+	AssertTrue(t, err == nil)
+
+	d2.LocalInsert(0, "ბ")
+	d2.LocalInsert(1, "a")
+	d2.LocalInsert(2, "d")
+	d2.LocalInsert(3, "o")
+	d2.LocalInsert(4, "R")
+	d2.LocalInsert(5, "o")
+	d2.LocalInsert(6, "q")
+	d2.LocalInsert(7, "l")
+	d2.LocalInsert(8, "d")
+	d2.LocalInsert(3, "p")
+	d2.LocalInsert(5, " ")
+
+	fmt.Println(d1.ToString())
+	fmt.Println(d2.ToString())
+
+	d1State := d1.GetCurrentState()
+	d2State := d2.GetCurrentState()
+
+	d1Patch := d2.CreatePatch(d1State)
+	d2Patch := d1.CreatePatch(d2State)
+
+	d1.ApplyPatch(d1Patch)
+	d2.ApplyPatch(d2Patch)
+
+	AssertTrue(t, d1.GetID() == d2.GetID())
+	fmt.Println(d1.ToString())
+	fmt.Println(d2.ToString())
+	AssertTrue(t, d1.ToString() == d2.ToString())
+}
+
+func TestOverlappingPatchApply(t *testing.T) {
+	d1 := synceddoc.New("1")
+
+	d1.LocalInsert(0, "h")
+	d1.LocalInsert(1, "e")
+	d1.LocalInsert(2, "l")
+	d1.LocalInsert(3, "o")
+	d1.LocalInsert(4, "w")
+	d1.LocalInsert(5, "o")
+	d1.LocalInsert(6, "r")
+	d1.LocalInsert(7, "l")
+	d1.LocalInsert(8, "d")
+	d1.LocalInsert(3, "l")
+	d1.LocalInsert(5, " ")
+
+	d2, err := synceddoc.Open("2", string(d1.GetID()))
+	AssertTrue(t, err == nil)
+
+	d2.LocalInsert(0, "ბ")
+	d2.LocalInsert(1, "a")
+	d2.LocalInsert(2, "d")
+	d2.LocalInsert(3, "o")
+	d2.LocalInsert(4, "R")
+	d2.LocalInsert(5, "o")
+	d2.LocalInsert(6, "q")
+	d2.LocalInsert(7, "l")
+	d2.LocalInsert(8, "d")
+	d2.LocalInsert(3, "p")
+	d2.LocalInsert(5, " ")
+
+	fmt.Println(d1.ToString())
+	fmt.Println(d2.ToString())
+
+	d1State := d1.GetCurrentState()
+	d2State := d2.GetCurrentState()
+
+	d1Patch := d2.CreatePatch(d1State)
+
+	d1.ApplyPatch(d1Patch)
+
+	// add modifications to the document
+	d1.LocalInsert(8, "a")
+	d1.LocalInsert(3, "b")
+	d1.LocalInsert(5, "c")
+
+	d2Patch := d1.CreatePatch(d2State)
+
+	d2.ApplyPatch(d2Patch)
+
+	AssertTrue(t, d1.GetID() == d2.GetID())
+	fmt.Println(d1.ToString())
+	fmt.Println(d2.ToString())
+	AssertTrue(t, d1.ToString() == d2.ToString())
+}
+

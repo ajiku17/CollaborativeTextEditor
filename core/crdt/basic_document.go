@@ -125,6 +125,8 @@ func (d *BasicDocument) InsertAtPosition(pos Position, val string) int {
 	for i, e := range d.Elems {
 		if d.PositionManager.PositionIsLessThan(e.Position, pos) {
 			index = i
+		} else if d.PositionManager.PositionsEqual(e.Position, pos) {
+			return -1
 		} else {
 			break
 		}
@@ -139,11 +141,16 @@ func (d *BasicDocument) InsertAtPosition(pos Position, val string) int {
 func (d *BasicDocument) DeleteAtPosition (pos Position) int {
 	var index int
 
+	index = -1
 	for i, e := range d.Elems {
 		if d.PositionManager.PositionsEqual(e.Position, pos) {
 			index = i
 			break
 		}
+	}
+
+	if index == -1 {
+		return -1
 	}
 
 	d.DocDelete(index)
