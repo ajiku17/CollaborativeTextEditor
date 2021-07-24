@@ -12,6 +12,7 @@ import (
 
 type PeerConnectionCallback func(string, *PeerConn, interface{})
 type PeerConnectionRequestCallback func (*PeerConn, ConnOffer, interface{})
+type PeerDisconnectionCallback func (string, *PeerConn, interface{})
 
 type ApplyMsg struct {
 	CommandValid   bool
@@ -31,6 +32,7 @@ type P2P struct {
 
 	peerConnectionCallback        PeerConnectionCallback
 	peerConnectionRequestCallback PeerConnectionRequestCallback
+	peerDisconnectionCallback PeerDisconnectionCallback
 
 	inbound  chan []byte
 	outbound chan []byte
@@ -73,6 +75,10 @@ func (p *P2P) OnPeerConnectionRequest(callback PeerConnectionRequestCallback) {
 	p.peerConnectionRequestCallback = callback
 }
 
+func (p *P2P) OnPeerDisconnection(callback PeerDisconnectionCallback) {
+	p.peerDisconnectionCallback = callback
+}
+
 func (p *P2P) Start() error {
 	err := p.signal.Dial()
 	if err != nil {
@@ -94,6 +100,8 @@ func (p *P2P) Stop() {
 	defer p.mu.Unlock()
 
 	p.stopped = true
+	fmt.Println("peerDisconnectionCallback  in Stop()", p.peerId)
+	p.peerDisconnectionCallback(p.peerId, nil, nil)
 }
 
 func (p *P2P) receiver() {
@@ -330,7 +338,14 @@ func (p *P2P) SetupConn(peer *PeerConn, peerId string) error {
 	p.msgQueues[peer.endpointId] = inboundSignals
 	p.mu.Unlock()
 
-	return p.setupConn(peer, peer.endpointId, inboundSignals)
+	err := p.setupConn(peer, peer.endpointId, inboundSignals)
+	if err != nil {
+		return err
+	}
+
+	p.peerConnectionCallback(peer.endpointId, peer, nil)
+
+	return nil
 }
 
 func (p *P2P) setupConn(peer *PeerConn, peerId string, inboundSignals chan interface{}) error {
@@ -402,7 +417,12 @@ func (p *P2P) setupConn(peer *PeerConn, peerId string, inboundSignals chan inter
 	// Set the handler for Peer connection state
 	// This will notify you when the peer has connected/disconnected
 	peer.Conn.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
-		//fmt.Printf("%s Peer Connection State has changed: %s\n", p.peerId, s.String())
+		fmt.Printf("%s Peer Connection State has changed: %s\n", p.peerId, s.String())
+
+		if s == webrtc.PeerConnectionStateDisconnected {
+			fmt.Println("peerDisconnectionCallback  in ONConnectionStateChange()", p.peerId)
+			p.peerDisconnectionCallback(p.peerId, nil, nil)
+		}
 
 		if s != webrtc.PeerConnectionStateConnected && s != webrtc.PeerConnectionStateConnecting{
 			errc <- fmt.Errorf(s.String())
@@ -521,7 +541,12 @@ func (p *P2P) connectionRequested (offer ConnOffer) {
 	// Set the handler for Peer connection state
 	// This will notify you when the peer has connected/disconnected
 	peer.Conn.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
-		//fmt.Printf("%s Peer Connection State has changed: %s\n", p.peerId, s.String())
+		fmt.Printf("%s Peer Connection State has changed: %s\n", p.peerId, s.String())
+
+		if s == webrtc.PeerConnectionStateDisconnected {
+			fmt.Println("peerDisconnectionCallback  in ONConnectionStateChange2()", p.peerId)
+			p.peerDisconnectionCallback(p.peerId, nil, nil)
+		}
 
 		if s != webrtc.PeerConnectionStateConnected && s != webrtc.PeerConnectionStateConnecting{
 			errc <- fmt.Errorf(s.String())

@@ -20,16 +20,41 @@ function enableButtons() {
 }
 
 function disableEditor() {
-    editor.options.readOnly = 'nocursor'
+    editor.options.readOnly = true
 }
 
 function enableEditor() {
     editor.options.readOnly = false
 }
 
+function enableLoading() {
+    document.querySelectorAll('div:not(.loader)').forEach(function(currentValue, currentIndex, listObj) {
+        currentValue.style.display = 'none';
+    })
+    document.getElementsByClassName('loader').item(0).style.display = 'block'
+}
+
+function disableLoading() {
+    document.querySelectorAll('div:not(.loader)').forEach(function(currentValue, currentIndex, listObj) {
+        currentValue.style.display = 'block';
+    })
+    document.getElementsByClassName('loader').item(0).style.display = 'none'
+}
+
+function connectionChanged(connected) {
+    console.log(connected)
+    if (connected) {
+        console.log(document.getElementsByClassName('connection').item(0))
+        document.getElementsByClassName('connection').item(0).style.backgroundColor = '#00bb00'
+    } else {
+        document.getElementsByClassName('connection').item(0).style.backgroundColor = '#aa1111'
+    }
+}
+
 function documentLoaded(documentId) {
     docId = documentId
     pushState(docId)
+    console.log("Document Loaded!")
     enableEditor()
 }
 
@@ -105,11 +130,32 @@ function onDocChange(changeName, changeObj) {
 
 function onPeerConnect(peerId, cursorPos) {
     console.log("peer ", peerId, " connected with cursor position ", cursorPos)
+    addPeer(peerId)
+}
+
+function addPeer(peerId) {
+    var ul = document.getElementById('connected-peers');
+    var li = document.createElement("li");
+    li.setAttribute('id', peerId)
+    var t = document.createTextNode(peerId + " Connected");
+    li.appendChild(t);
+    ul.appendChild(li);
 }
 
 function onPeerDisconnect(peerId) {
     console.log("peer ", peerId, " disconnected")
+    removePeer(peerId)
 }
+
+function removePeer(peerId) {
+    var li = document.getElementById(peerId);
+    if (li != null && li != undefined) {
+        li.textContent = peerId + " disconnected"
+        li.value = peerId + "Disconnected";
+    }
+
+}
+
 
 function pushState(docId) {
     var path = '?doc=' + docId
@@ -141,6 +187,17 @@ function closeDoc() {
     popState()
     disableEditor()
     inputElement.value = ""
+}
+
+function disconnect() {
+    connectionChanged(false)
+    DocumentDisconnect(docId)
+}
+
+function reconnect() {
+    connectionChanged(true)
+    console.log("REconnect")
+    DocumentReconnect(docId)
 }
 
 function downloadFile(data, filename) {
@@ -175,7 +232,7 @@ inputElement.onchange = (e) => {
             return parseInt(item, 10)
         })), initCallback, onDocChange, onPeerConnect, onPeerDisconnect, documentLoaded)
     }
-    reader.onerror = (e) => {
+    reader.onerror = (e ) => {
         const error = e.target.error
         console.error(`Error occurred while reading ${file.name}`, error)
     }
@@ -197,11 +254,14 @@ function parseReq () {
 function initJS() {
     // initially the editor is disabled
     console.log("init js")
+
+    enableLoading()
     disableButtons()
     disableEditor()
 
     setTimeout(function () {
         parseReq()
+        disableLoading()
     }, 3000)
 
     console.log("disabling editor")
