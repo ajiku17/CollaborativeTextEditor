@@ -256,11 +256,53 @@ func TestSimpleDisconnect(t *testing.T) {
 
 // stress test with lots of connects, disconnects and message broadcasts between two peers
 func TestStressConnectDisconnect(t *testing.T) {
+	server.NewServer()
+	document1, manager1 := connect()
+	time.Sleep(2 * time.Second)
+
+	document1.LocalInsert(0, "H")
+	time.Sleep(time.Second)
+
+
+	document2, manager2 := connect()
+	time.Sleep(time.Second)
+
+	document2.LocalInsert(document2.GetDocument().Length(), "i")
+	time.Sleep(time.Second)
+
+	manager1.Stop()
+	time.Sleep(time.Second)
+
+	document2.LocalInsert(document2.GetDocument().Length(), "!")
+	time.Sleep(5 * time.Second)
+
+	manager1.Start()
+	time.Sleep(time.Second)
+	fmt.Println(document1.GetDocument().ToString())
+	fmt.Println(document2.GetDocument().ToString())
+	fmt.Println(document1.GetLogs())
+	fmt.Println(document2.GetLogs())
+
+	AssertTrue(t, document1.GetDocument().ToString() == document2.GetDocument().ToString())
+	manager1.Kill()
+	manager2.Kill()
 }
 
 // stress test with lots of connects, disconnects and message broadcasts between multiple peers
 func TestStressConnectDisconnectMultiple(t *testing.T) {
 
+}
+
+func TestOpenExistingDocument(t *testing.T) {
+	siteId := utils.GenerateNewUUID()
+	document1 := synceddoc.New(string(siteId))
+	documentId := document1.GetID()
+	document1.LocalInsert(0, "H")
+	document1.LocalInsert(1, "i")
+
+	document2, _ := synceddoc.Open(string(utils.GenerateNewUUID()), string(documentId))
+
+	AssertTrue(t, document2.GetDocument().Length() == 2)
 }
 
 

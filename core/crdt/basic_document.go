@@ -23,6 +23,7 @@ type OpDelete struct {
 type BasicDocument struct {
 	Elems           []Element
 	PositionManager PositionManager
+	// Operations made by me
 	History         []interface{}
 }
 
@@ -131,7 +132,7 @@ func (d *BasicDocument) InsertAtPosition(pos Position, val string) int {
 	}
 
 	d.DocInsert(index + 1, Element{Position: pos, Data: val})
-	d.pushBackHistory(OpInsert {Pos: pos, Val: val})
+	//d.pushBackHistory(OpInsert {Pos: pos, Val: val})
 
 	return index
 }
@@ -147,7 +148,7 @@ func (d *BasicDocument) DeleteAtPosition (pos Position) int {
 	}
 
 	d.DocDelete(index)
-	d.pushBackHistory(OpDelete {Pos: pos})
+	//d.pushBackHistory(OpDelete {Pos: pos})
 
 	return index - 1
 }

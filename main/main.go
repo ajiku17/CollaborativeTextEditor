@@ -45,6 +45,11 @@ func main() {
 
 	fmt.Printf("Document for site %s is : %s\n", doc1.GetSiteID(), doc1.GetDocument().ToString())
 	fmt.Printf("Document for site %s is : %s\n", doc2.GetSiteID(), doc2.GetDocument().ToString())
+	fmt.Printf("Log for site %s is : %s\n", doc1.GetSiteID(), doc1.GetLogs())
+	fmt.Printf("Log for site %s is : %s\n", doc2.GetSiteID(), doc2.GetLogs())
+	log, counts := server.GetLog()
+	fmt.Printf("Global Log %s", log)
+	fmt.Printf("Global Log %s", counts)
 }
 
 // Example: d.onChange(MESSAGE_INSERT, MessageInsert{Index: index, Value: val}, aux)

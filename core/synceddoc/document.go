@@ -62,6 +62,7 @@ type Document interface {
 
 	ToString() string
 	GetDocument() crdt.Document
+	GetLogs() []LogEntry
 }
 
 /*

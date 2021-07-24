@@ -36,7 +36,7 @@ type MessagePeerCursor struct {
 }
 
 type ConnectRequest struct {
-	Id          utils.UUID
+	PrevLog		map[utils.UUID]int
 }
 
 type DisconnectRequest struct {

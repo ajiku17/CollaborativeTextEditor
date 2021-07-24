@@ -279,15 +279,3 @@ func TestConnectSignals(t *testing.T) {
 func TestSetCursor(t *testing.T) {
 
 }
-
-func TestOpenExistingDocument(t *testing.T) {
-	siteId := utils.GenerateNewUUID()
-	document1 := synceddoc.New(string(siteId))
-	documentId := document1.GetID()
-	document1.LocalInsert(0, "H")
-	document1.LocalInsert(1, "i")
-
-	document2, _ := synceddoc.Open(string(utils.GenerateNewUUID()), string(documentId))
-
-	AssertTrue(t, document2.GetDocument().Length() == 2)
-}

@@ -2,6 +2,7 @@ package network
 
 import (
 	"github.com/ajiku17/CollaborativeTextEditor/core/synceddoc"
+	"github.com/ajiku17/CollaborativeTextEditor/tracker/client"
 	"net"
 	"time"
 
@@ -12,7 +13,7 @@ type NetworkClient struct {
 	id utils.UUID
 	socket net.Conn
 	document *synceddoc.Document
-	//trackerClient *client.Client
+	trackerClient *client.Client
 	alive bool
 }
 
@@ -21,7 +22,7 @@ func NewDocumentManager(id utils.UUID, synccedDoc *synceddoc.Document) Manager {
 	manager.id = id
 	manager.document = synccedDoc
 	manager.alive = false
-	//manager.trackerClient =
+	manager.trackerClient = client.New("localhost:8080")
 	manager.connect()
 	return manager
 }
@@ -31,9 +32,20 @@ func (manager *NetworkClient) GetId() utils.UUID {
 }
 
 func (manager *NetworkClient) Start() {
+	var operationRequest synceddoc.OperationRequest
 	manager.alive = true
-	operationRequest := synceddoc.OperationRequest{manager.id, synceddoc.ConnectRequest{manager.id}}
+	if(len((*manager.document).GetLogs()) == 0) {
+		operationRequest = synceddoc.OperationRequest{manager.id, synceddoc.ConnectRequest{make(map[utils.UUID]int)}}
+	} else {
+		operationRequest = synceddoc.OperationRequest{manager.id, synceddoc.ConnectRequest{(*manager.document).GetLogs()[0].LogState}}
+	}
 	manager.sendRequest(utils.ToBytes(operationRequest))
+
+	//peers := manager.trackerClient.Get(string((*manager.document).Get    ID()))
+	//if len(peers) == 0 {
+	//	manager.trackerClient.Register(string((*manager.document).GetID()), string(manager.GetId()))
+	//}
+
 	go manager.messageReceived()
 	go manager.broadcastMessages()
 }
@@ -108,4 +120,8 @@ func (manager *NetworkClient)sendRequest(bytes []byte) {
 			return
 		}
 	}
+}
+
+func (manager *NetworkClient) IsAlive() bool{
+	return manager.alive
 }

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"github.com/ajiku17/CollaborativeTextEditor/database"
 	"sync"
 
 	"github.com/ajiku17/CollaborativeTextEditor/core/crdt"
@@ -39,7 +38,7 @@ type SyncedDocument struct {
 }
 
 
-var db = database.GetDatabase()
+//var db = database.GetDatabase()
 
 func (d *SyncedDocument) ConnectSignals(changeListener ChangeListener,
 	peerConnectedListener PeerConnectedListener,
@@ -100,7 +99,7 @@ func New(siteId string) Document {
 	initDocState(doc)
 	registerTypes()
 
-	db.AddDocument(doc.id, doc)
+	//db.AddDocument(doc.id, doc)
 	return doc
 }
 
@@ -108,16 +107,16 @@ func New(siteId string) Document {
 func Open(siteId string, docId string) (Document, error) {
 	doc := new (SyncedDocument)
 
-	existingDocument := db.GetDocument(utils.UUID(docId))
-	if existingDocument != nil {
-		return existingDocument.(Document), nil
-	}
+	//existingDocument := db.GetDocument(utils.UUID(docId))
+	//if existingDocument != nil {
+	//	return existingDocument.(Document), nil
+	//}
 	doc.id = utils.UUID(docId)
 	doc.siteId = utils.UUID(siteId)
 
 	initDocState(doc)
 
-	db.AddDocument(utils.UUID(docId), doc)
+	//db.AddDocument(utils.UUID(docId), doc)
 	return doc, nil
 }
 
@@ -153,7 +152,7 @@ func Load(siteId string, serializedData []byte) (Document, error) {
 		return nil, err
 	}
 
-	db.AddDocument(doc.id, doc)
+	//db.AddDocument(doc.id, doc)
 	return doc, nil
 }
 
@@ -218,7 +217,7 @@ func (d *SyncedDocument) RemoteInsert(peerId utils.UUID, position crdt.Position,
 
 	index := d.localDocument.InsertAtPosition(position, val)
 
-	d.incrementPeerLastLogSequence(peerId)
+	//d.incrementPeerLastLogSequence(peerId)
 
 	if d.onChange != nil {
 		d.onChange(MESSAGE_INSERT, MessageInsert{Index: index, Value: val}, aux)
@@ -239,7 +238,7 @@ func (d *SyncedDocument) RemoteDelete(peerId utils.UUID, position crdt.Position,
 
 	index := d.localDocument.DeleteAtPosition(position)
 
-	d.incrementPeerLastLogSequence(peerId)
+	//d.incrementPeerLastLogSequence(peerId)
 
 	if d.onChange != nil {
 		d.onChange(MESSAGE_DELETE, MessageDelete{Index: index}, aux)
@@ -249,11 +248,11 @@ func (d *SyncedDocument) RemoteDelete(peerId utils.UUID, position crdt.Position,
 func (d *SyncedDocument) ApplyRemoteOp(peerId utils.UUID, op Op, aux interface{}) {
 	switch op.(type) {
 	case crdt.OpInsert:
-		d.toNotifyNextIndex ++
+		//d.toNotifyNextIndex ++
 		crdtOp := op.(crdt.OpInsert)
 		d.RemoteInsert(peerId, crdtOp.Pos, crdtOp.Val, aux)
 	case crdt.OpDelete:
-		d.toNotifyNextIndex ++
+		//d.toNotifyNextIndex ++
 		crdtOp := op.(crdt.OpDelete)
 		d.RemoteDelete(peerId, crdtOp.Pos, aux)
 	default:
@@ -308,4 +307,8 @@ func (d *SyncedDocument) String() string {
 
 func (d *SyncedDocument) GetDocument() crdt.Document {
 	return d.localDocument
+}
+
+func (d *SyncedDocument) GetLogs() []LogEntry {
+	return d.log
 }

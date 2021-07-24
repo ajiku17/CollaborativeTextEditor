@@ -13,7 +13,9 @@ import (
 
 type Server struct {
 	ConnectedSockets map[utils.UUID]net.Conn
-	Changes []interface{}
+	Changes          []interface{}
+	GlobalLogCountState map[utils.UUID] int
+	GlobalLogState map[utils.UUID] []synceddoc.OperationRequest
 	lock             *sync.Mutex
 }
 
@@ -24,6 +26,8 @@ func NewServer() *Server {
 		server = &Server{}
 		server.ConnectedSockets = make(map[utils.UUID]net.Conn)
 		server.Changes = make([]interface{}, 0)
+		server.GlobalLogCountState = make(map[utils.UUID]int)
+		server.GlobalLogState = make(map[utils.UUID] []synceddoc.OperationRequest)
 		server.lock = &sync.Mutex{}
 	}
 	go server.Listen()
@@ -83,15 +87,17 @@ func (server *Server) HandleRequest(socket net.Conn) {
 
 		switch operation.(type) {
 			case synceddoc.ConnectRequest:
-				server.setSocketId(operation.(synceddoc.ConnectRequest).Id, socket)
-				go server.syncNewConnection(operation.(synceddoc.ConnectRequest).Id)
+				server.setSocketId(data.Id, socket)
+				go server.syncNewConnection(data.Id, operation.(synceddoc.ConnectRequest))
 			case synceddoc.DisconnectRequest:
 				server.removeSocketId(operation.(synceddoc.DisconnectRequest).Id)
 			case crdt.OpInsert:
 				server.Changes = append(server.Changes, data)
+				server.incrementLogSequence(data.Id, data)
 				go server.sendAll(data)
 			case crdt.OpDelete:
 				server.Changes = append(server.Changes, data)
+				server.incrementLogSequence(data.Id, data)
 				go server.sendAll(data)
 			default:
 				fmt.Println("Different type")
@@ -99,8 +105,25 @@ func (server *Server) HandleRequest(socket net.Conn) {
 	}
 }
 
-func (server *Server)syncNewConnection(id utils.UUID) {
-	for _, bytes := range server.Changes {
+func (server *Server)syncNewConnection(id utils.UUID, operation synceddoc.ConnectRequest) {
+	fmt.Println("Sync")
+	peerLog := operation.PrevLog
+	for peerId, globalCount := range server.GlobalLogCountState {
+		if count, ok := peerLog[peerId]; ok {
+			if globalCount != count {
+				fmt.Println("Sending last ", globalCount - count)
+				go server.sendLastNOperations(id, peerId, globalCount - count)
+			}
+		} else {
+			fmt.Println("Sending last ", globalCount, "(all)")
+			go server.sendLastNOperations(id, peerId, globalCount)
+		}
+	}
+}
+
+func (server *Server) sendLastNOperations(id utils.UUID, operationOwnerId utils.UUID, n int) {
+	globalLog := server.GlobalLogState
+	for _, bytes := range globalLog[operationOwnerId][len(globalLog[operationOwnerId]) - n:] {
 		go server.sendNotify(id, bytes)
 	}
 }
@@ -112,4 +135,20 @@ func (server *Server) setSocketId(id utils.UUID, socket net.Conn) {
 
 func (server *Server) removeSocketId(id utils.UUID) {
 	delete(server.ConnectedSockets, id)
+}
+
+func (server *Server) incrementLogSequence(peerId utils.UUID, data synceddoc.OperationRequest) {
+	fmt.Println("Increment ", peerId)
+	if _, ok := server.GlobalLogState[peerId]; ok {
+		server.GlobalLogState[peerId] = append(server.GlobalLogState[peerId], data)
+		server.GlobalLogCountState[peerId] ++
+	} else {
+		server.GlobalLogState[peerId] = make([]synceddoc.OperationRequest, 1)
+		server.GlobalLogState[peerId][0] = data
+		server.GlobalLogCountState[peerId] = 1
+	}
+}
+
+func (server *Server) GetLog() (map[utils.UUID][]synceddoc.OperationRequest, map[utils.UUID]int) {
+	return server.GlobalLogState, server.GlobalLogCountState
 }
