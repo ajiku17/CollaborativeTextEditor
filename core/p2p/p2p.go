@@ -79,7 +79,6 @@ func (p *P2P) Start() error {
 		fmt.Println("p2p signaling dial error:", err)
 		return err
 	}
-	fmt.Println("p2p signaling dial error:", err)
 
 	go p.receiver()
 	go p.sender()
@@ -316,6 +315,7 @@ func (p *P2P) signalMessage(peerId string, msg P2PMessage) error {
 }
 
 func (p *P2P) SetupConn(peer *PeerConn, peerId string) error {
+	//fmt.Println(p.peerId, "setting up connection with", peer.GetEndpoint())
 	inboundSignals := make(chan interface{}, 100)
 
 	peer.endpointId = peerId
@@ -404,7 +404,7 @@ func (p *P2P) setupConn(peer *PeerConn, peerId string, inboundSignals chan inter
 	peer.Conn.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
 		//fmt.Printf("%s Peer Connection State has changed: %s\n", p.peerId, s.String())
 
-		if s != webrtc.PeerConnectionStateConnected {
+		if s != webrtc.PeerConnectionStateConnected && s != webrtc.PeerConnectionStateConnecting{
 			errc <- fmt.Errorf(s.String())
 		}
 	})
@@ -523,7 +523,7 @@ func (p *P2P) connectionRequested (offer ConnOffer) {
 	peer.Conn.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
 		//fmt.Printf("%s Peer Connection State has changed: %s\n", p.peerId, s.String())
 
-		if s != webrtc.PeerConnectionStateConnected {
+		if s != webrtc.PeerConnectionStateConnected && s != webrtc.PeerConnectionStateConnecting{
 			errc <- fmt.Errorf(s.String())
 		}
 	})

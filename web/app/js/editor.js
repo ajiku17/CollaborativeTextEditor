@@ -202,7 +202,7 @@ function initJS() {
 
     setTimeout(function () {
         parseReq()
-    }, 5000)
+    }, 3000)
 
     console.log("disabling editor")
     enableButtons()

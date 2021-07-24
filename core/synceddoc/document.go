@@ -14,8 +14,15 @@ type ChangeListener func (changeName string, change interface {}, aux interface{
 type PeerConnectedListener func (peerId utils.UUID, cursorPosition int, aux interface{})
 type PeerDisconnectedListener func (peerId utils.UUID, aux interface{})
 
-type DocumentState interface{}
-type Patch         interface{}
+type DocumentState interface{
+	NumberOfOps() int
+	String() string
+}
+
+type Patch interface{
+	NumberOfOps() int
+	String() string
+}
 
 type Document interface {
 	GetID() utils.UUID

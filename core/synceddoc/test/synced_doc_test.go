@@ -5,6 +5,7 @@ import (
 	"github.com/ajiku17/CollaborativeTextEditor/core/crdt"
 	"github.com/ajiku17/CollaborativeTextEditor/core/synceddoc"
 	"github.com/ajiku17/CollaborativeTextEditor/utils"
+	"github.com/emirpasic/gods/maps/treemap"
 	"reflect"
 	"testing"
 )
@@ -443,8 +444,6 @@ func TestFindMissingIndices(t *testing.T) {
 	AssertTrue(t, len(missing) == 0)
 }
 
-
-
 func TestCreatePatch(t *testing.T) {
 	d := synceddoc.New("1")
 
@@ -466,10 +465,14 @@ func TestCreatePatch(t *testing.T) {
 	AssertTrue(t, err == nil)
 
 	d1State := d1.GetCurrentState()
+	AssertTrue(t, d1State.NumberOfOps() == 0)
 
 	patch := d.CreatePatch(d1State)
+	AssertTrue(t, patch.NumberOfOps() == 11)
 
 	d1.ApplyPatch(patch)
+	d1State = d1.GetCurrentState()
+	AssertTrue(t, d1State.NumberOfOps() == 11)
 
 	AssertTrue(t, d.GetID() == d1.GetID())
 	fmt.Println("d string:", d.ToString())
@@ -477,6 +480,8 @@ func TestCreatePatch(t *testing.T) {
 	AssertTrue(t, d.ToString() == d1.ToString())
 
 	d1.ApplyPatch(patch) // apply patch once more
+	d1State = d1.GetCurrentState()
+	AssertTrue(t, d1State.NumberOfOps() == 11)
 
 	AssertTrue(t, d.GetID() == d1.GetID())
 	fmt.Println("d string:", d.ToString())
@@ -487,10 +492,14 @@ func TestCreatePatch(t *testing.T) {
 	AssertTrue(t, err == nil)
 
 	d2State := d2.GetCurrentState()
+	AssertTrue(t, d2State.NumberOfOps() == 0)
 
 	patch = d1.CreatePatch(d2State)
+	AssertTrue(t, patch.NumberOfOps() == 11)
 
 	d2.ApplyPatch(patch)
+	d2State = d2.GetCurrentState()
+	AssertTrue(t, d2State.NumberOfOps() == 11)
 
 	AssertTrue(t, d1.GetID() == d2.GetID())
 	fmt.Println("d1 string:", d1.ToString())
@@ -516,7 +525,7 @@ func TestPatchApply(t *testing.T) {
 	d2, err := synceddoc.Open("2", string(d1.GetID()))
 	AssertTrue(t, err == nil)
 
-	d2.LocalInsert(0, "ბ")
+	d2.LocalInsert(0, "b")
 	d2.LocalInsert(1, "a")
 	d2.LocalInsert(2, "d")
 	d2.LocalInsert(3, "o")
@@ -564,7 +573,7 @@ func TestOverlappingPatchApply(t *testing.T) {
 	d2, err := synceddoc.Open("2", string(d1.GetID()))
 	AssertTrue(t, err == nil)
 
-	d2.LocalInsert(0, "ბ")
+	d2.LocalInsert(0, "b")
 	d2.LocalInsert(1, "a")
 	d2.LocalInsert(2, "d")
 	d2.LocalInsert(3, "o")
@@ -600,6 +609,84 @@ func TestOverlappingPatchApply(t *testing.T) {
 	fmt.Println(d2.ToString())
 	AssertTrue(t, d1.ToString() == d2.ToString())
 }
+
+func insertString(d synceddoc.Document, text string) {
+	for i, s := range text {
+		d.LocalInsert(i, string(s))
+	}
+}
+
+func TestOverlappingPatchApplyConcurrent(t *testing.T) {
+	d1 := synceddoc.New("1")
+
+	insertString(d1, "hello world")
+
+	d2, err := synceddoc.Open("2", string(d1.GetID()))
+	AssertTrue(t, err == nil)
+
+	insertString(d2, "hhhellllloo")
+
+	d3, err := synceddoc.Open("3", string(d1.GetID()))
+	AssertTrue(t, err == nil)
+
+	fmt.Println(d1.ToString())
+	fmt.Println(d2.ToString())
+
+	d1State := d1.GetCurrentState()
+	d2State := d2.GetCurrentState()
+
+	d1Patch := d2.CreatePatch(d1State)
+	AssertTrue(t, d1Patch.NumberOfOps() == 11)
+	d3Patch := d1.CreatePatch(d2.GetCurrentState())
+
+	d1.ApplyPatch(d1Patch)
+	AssertTrue(t, d1Patch.NumberOfOps() == 11)
+	AssertTrue(t, d1.GetCurrentState().NumberOfOps() == 22)
+
+	// add modifications to the document
+	d1.LocalInsert(8, "a")
+	d1.LocalInsert(3, "b")
+	d1.LocalInsert(5, "c")
+
+	AssertTrue(t, d1.GetCurrentState().NumberOfOps() == 25)
+
+	d2Patch := d1.CreatePatch(d2State)
+	AssertTrue(t, d2Patch.NumberOfOps() == 14)
+
+	d2.ApplyPatch(d2Patch)
+	AssertTrue(t, d2.GetCurrentState().NumberOfOps() == 25)
+
+	AssertTrue(t, d1.GetID() == d2.GetID())
+	fmt.Println(d1.ToString())
+	fmt.Println(d2.ToString())
+	AssertTrue(t, d1.ToString() == d2.ToString())
+
+	AssertTrue(t, d3.GetCurrentState().NumberOfOps() == 0)
+	d3Patchd2 := d2.CreatePatch(d3.GetCurrentState())
+	AssertTrue(t, d3Patchd2.NumberOfOps() == 25)
+
+	d3Patchd1 := d1.CreatePatch(d3.GetCurrentState())
+	AssertTrue(t, d3Patchd1.NumberOfOps() == 25)
+
+	d3.ApplyPatch(d1Patch)
+	AssertTrue(t, d3.GetCurrentState().NumberOfOps() == 11)
+
+	d3.ApplyPatch(d3Patch)
+	AssertTrue(t, d3.GetCurrentState().NumberOfOps() == 22)
+
+	d3PatchN := d1.CreatePatch(d3.GetCurrentState())
+	AssertTrue(t, d3PatchN.NumberOfOps() == 3)
+
+	d3.ApplyPatch(d3PatchN)
+	AssertTrue(t, d3.GetCurrentState().NumberOfOps() == 25)
+
+	d3.ApplyPatch(d3Patchd1)
+	AssertTrue(t, d3.GetCurrentState().NumberOfOps() == 25)
+
+	d3.ApplyPatch(d3Patchd2)
+	AssertTrue(t, d3.GetCurrentState().NumberOfOps() == 25)
+}
+
 
 func TestLocalOpsFrom(t *testing.T) {
 	d1 := synceddoc.New("1")
@@ -679,3 +766,110 @@ func TestLocalOpsFrom(t *testing.T) {
 	AssertTrue(t, d1.ToString() == d2.ToString())
 }
 
+func printIntervalTree(tree *treemap.Map) {
+	it := tree.Iterator()
+	for it.Next() {
+		fmt.Printf("%v, ", it.Key().(synceddoc.Interval))
+	}
+	fmt.Println()
+}
+
+func TestAddIndexInIntervalTree(t *testing.T) {
+	tree := treemap.NewWith(synceddoc.IntervalComparator)
+
+	tree.Put(synceddoc.Interval{14, 25}, nil)
+	tree.Put(synceddoc.Interval{56, 96}, nil)
+
+	AssertTrue(t , tree.Size() == 2)
+
+	synceddoc.AddIndexInIntervalTree(tree, synceddoc.Interval{35, 40})
+	AssertTrue(t , tree.Size() == 3)
+	_, ok1 := tree.Get(synceddoc.Interval{14, 25})
+	_, ok2 := tree.Get(synceddoc.Interval{35, 40})
+	_, ok3 := tree.Get(synceddoc.Interval{56, 96})
+	AssertTrue(t, ok1)
+	AssertTrue(t, ok2)
+	AssertTrue(t, ok3)
+
+	synceddoc.AddIndexInIntervalTree(tree, synceddoc.Interval{37, 40})
+	AssertTrue(t , tree.Size() == 3)
+	_, ok1 = tree.Get(synceddoc.Interval{14, 25})
+	_, ok2 = tree.Get(synceddoc.Interval{35, 40})
+	_, ok3 = tree.Get(synceddoc.Interval{56, 96})
+	AssertTrue(t, ok1)
+	AssertTrue(t, ok2)
+	AssertTrue(t, ok3)
+
+	synceddoc.AddIndexInIntervalTree(tree, synceddoc.Interval{37, 50})
+	AssertTrue(t , tree.Size() == 3)
+	_, ok1 = tree.Get(synceddoc.Interval{14, 25})
+	_, ok2 = tree.Get(synceddoc.Interval{35, 50})
+	_, ok3 = tree.Get(synceddoc.Interval{56, 96})
+	AssertTrue(t, ok1)
+	AssertTrue(t, ok2)
+	AssertTrue(t, ok3)
+
+	synceddoc.AddIndexInIntervalTree(tree, synceddoc.Interval{37, 56})
+	AssertTrue(t , tree.Size() == 2)
+	_, ok1 = tree.Get(synceddoc.Interval{14, 25})
+	_, ok2 = tree.Get(synceddoc.Interval{35, 96})
+	AssertTrue(t, ok1)
+	AssertTrue(t, ok2)
+
+	synceddoc.AddIndexInIntervalTree(tree, synceddoc.Interval{5, 10})
+	AssertTrue(t , tree.Size() == 3)
+	_, ok1 = tree.Get(synceddoc.Interval{5, 10})
+	_, ok2 = tree.Get(synceddoc.Interval{14, 25})
+	_, ok3 = tree.Get(synceddoc.Interval{35, 96})
+	AssertTrue(t, ok1)
+	AssertTrue(t, ok2)
+	AssertTrue(t, ok3)
+
+
+	synceddoc.AddIndexInIntervalTree(tree, synceddoc.Interval{5, 5})
+	AssertTrue(t , tree.Size() == 3)
+	_, ok1 = tree.Get(synceddoc.Interval{5, 10})
+	_, ok2 = tree.Get(synceddoc.Interval{14, 25})
+	_, ok3 = tree.Get(synceddoc.Interval{35, 96})
+	AssertTrue(t, ok1)
+	AssertTrue(t, ok2)
+	AssertTrue(t, ok3)
+
+	synceddoc.AddIndexInIntervalTree(tree, synceddoc.Interval{3, 15})
+	AssertTrue(t , tree.Size() == 2)
+	_, ok1 = tree.Get(synceddoc.Interval{3, 25})
+	_, ok2 = tree.Get(synceddoc.Interval{35, 96})
+	AssertTrue(t, ok1)
+	AssertTrue(t, ok2)
+
+	synceddoc.AddIndexInIntervalTree(tree, synceddoc.Interval{30, 125})
+	AssertTrue(t , tree.Size() == 2)
+	_, ok1 = tree.Get(synceddoc.Interval{3, 25})
+	_, ok2 = tree.Get(synceddoc.Interval{30, 125})
+	AssertTrue(t, ok1)
+	AssertTrue(t, ok2)
+
+	synceddoc.AddIndexInIntervalTree(tree, synceddoc.Interval{0, 180})
+	AssertTrue(t , tree.Size() == 1)
+	_, ok1 = tree.Get(synceddoc.Interval{0, 180})
+	AssertTrue(t, ok1)
+
+	synceddoc.AddIndexInIntervalTree(tree, synceddoc.Interval{186, 190})
+	AssertTrue(t , tree.Size() == 2)
+	_, ok1 = tree.Get(synceddoc.Interval{0, 180})
+	_, ok2 = tree.Get(synceddoc.Interval{186, 190})
+	AssertTrue(t, ok1)
+	AssertTrue(t, ok2)
+
+	synceddoc.AddIndexInIntervalTree(tree, synceddoc.Interval{181, 185})
+	AssertTrue(t , tree.Size() == 1)
+	_, ok1 = tree.Get(synceddoc.Interval{0, 190})
+	AssertTrue(t, ok1)
+
+	synceddoc.AddIndexInIntervalTree(tree, synceddoc.Interval{0, 182})
+	AssertTrue(t , tree.Size() == 1)
+	_, ok1 = tree.Get(synceddoc.Interval{0, 190})
+	AssertTrue(t, ok1)
+
+
+}

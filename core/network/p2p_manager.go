@@ -71,8 +71,8 @@ func (m *P2PManager) Start() {
 	// Setup p2p
 	m.p2p.OnPeerConnectionRequest(func(conn *p2p.PeerConn, offer p2p.ConnOffer, aux interface{}) {
 		conn.OnMessage(func (msg []byte) {
-			//fmt.Printf("%s received a message from %s %s\n", m.p2p.GetPeerId(), conn.GetEndpoint(), string(msg))
 			p2pMsg, err := DecodeP2PMessage(msg)
+			//fmt.Printf("%s received a message from %s %s\n", m.p2p.GetPeerId(), conn.GetEndpoint(), string(msg))
 			if err == nil {
 				m.inbound <- p2pMsg
 			}
@@ -80,12 +80,24 @@ func (m *P2PManager) Start() {
 	})
 
 	m.p2p.OnPeerConnection(func(endpointPeerId string, conn *p2p.PeerConn, aux interface{}) {
-		fmt.Println(m.p2p.GetPeerId(), "received a connection from ", conn.GetEndpoint())
+		//fmt.Println(m.p2p.GetPeerId(), "received a connection from ", conn.GetEndpoint())
 
 		m.connsMu.Lock()
 		defer m.connsMu.Unlock()
 
 		m.conns[conn] = struct{}{}
+
+		docState := m.doc.GetCurrentState()
+		//fmt.Println(m.id, "sending patch request to newly established", conn.GetEndpoint())
+		m.outbound <- P2PMessage{
+			Sender:   string(m.id),
+			Receiver: conn.GetEndpoint(),
+			Data:     nil,
+			IsPatch:  false,
+			Patch:    nil,
+			IsState:  true,
+			State:    docState,
+		}
 	})
 
 	err = m.p2p.Start()
@@ -119,13 +131,25 @@ func (m *P2PManager) Start() {
 			//wg.Done()
 
 			if err != nil {
-				fmt.Println("P2P manager: error while setting up connection with", conn.GetEndpoint())
+				//fmt.Println(m.id, "P2P manager: error while setting up connection with", conn.GetEndpoint(), err)
 				return
 			}
 
 			m.connsMu.Lock()
 			m.conns[conn] = struct{}{} // save newly setup connection
 			m.connsMu.Unlock()
+
+			docState := m.doc.GetCurrentState()
+			//fmt.Println(m.id, "sending patch request to newly established", conn.GetEndpoint())
+			m.outbound <- P2PMessage{
+				Sender:   string(m.id),
+				Receiver: conn.GetEndpoint(),
+				Data:     nil,
+				IsPatch:  false,
+				Patch:    nil,
+				IsState:  true,
+				State:    docState,
+			}
 		} (p)
 	}
 
@@ -133,10 +157,11 @@ func (m *P2PManager) Start() {
 	// wait for connections
 	//wg.Wait()
 
-	go m.synchronizer()
+	m.startSynchronizer()
 }
 
-func (m *P2PManager) synchronizer() {
+func (m *P2PManager) startSynchronizer() {
+	fmt.Println("starting startSynchronizer")
 	go m.changeMonitor()
 	go m.sender()
 	go m.requestProcessor()
@@ -166,19 +191,18 @@ func (m *P2PManager) backgroundSync() {
 			State:    docState,
 		}
 
-		time.Sleep(5 * time.Second) // sleep for a while
+		time.Sleep(10 * time.Second) // sleep for a while
 	}
 }
 
 func (m *P2PManager) changeMonitor() {
-	lastChangeIndex := 0
-
+	lastChangeIndex := -1
+	//fmt.Println(m.id, "starting change monitor")
 	for {
 		var killed bool
 		m.mu.Lock()
 		killed = m.killed
 		m.mu.Unlock()
-
 		if killed {
 			fmt.Println(m.id, "change monitor has been killed")
 			return
@@ -194,7 +218,7 @@ func (m *P2PManager) changeMonitor() {
 				continue
 			}
 
-			//fmt.Println(m.id, "sending op", op, "to")
+			//fmt.Println(m.id, "sending new op with index", op.PeerOpIndex, "to others")
 			m.outbound <- P2PMessage{
 				Sender:   string(m.id),
 				Receiver: "",
@@ -206,7 +230,7 @@ func (m *P2PManager) changeMonitor() {
 			}
 		}
 
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(1000 * time.Millisecond)
 	}
 }
 
@@ -335,6 +359,7 @@ func (m *P2PManager) processRequest(msg P2PMessage) (bool, P2PMessage, error) {
 		return false, P2PMessage{}, err
 	}
 
+	//fmt.Println(m.id, "applying op index", op.PeerOpIndex, "from", op.PeerId)
 	m.doc.ApplyRemoteOp(op, nil)
 
 	return false, P2PMessage{}, nil

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/emirpasic/gods/maps/treemap"
 	utils2 "github.com/emirpasic/gods/utils"
+	"strconv"
 	"sync"
 
 	"github.com/ajiku17/CollaborativeTextEditor/core/crdt"
@@ -16,7 +17,7 @@ type Interval struct {
 	Start, End int
 }
 
-func intervalComparator(a, b interface{}) int {
+func IntervalComparator(a, b interface{}) int {
 	aIn := a.(Interval)
 	bIn := b.(Interval)
 
@@ -29,6 +30,10 @@ func intervalComparator(a, b interface{}) int {
 	}
 
 	return 0
+}
+
+func (i Interval) String() string {
+	return fmt.Sprintf("[%d-%d]", i.Start, i.End)
 }
 
 type LogEntry struct {
@@ -123,7 +128,7 @@ func setChangeListener(d *SyncedDocument, listener ChangeListener) {
 
 func (d *SyncedDocument) GetLocalOpsFrom(index int) ([]Op, int) {
 	res := []Op{}
-	lastIndex := 0
+	lastIndex := -1
 
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -131,16 +136,23 @@ func (d *SyncedDocument) GetLocalOpsFrom(index int) ([]Op, int) {
 	ops, ok := d.peerOps.Get(string(d.siteId))
 
 	if !ok {
+		//fmt.Println(d.siteId, "peer ops with id", d.siteId, "not found")
 		return res, lastIndex
 	}
 
 	localOps := ops.(*treemap.Map)
 
 	it := localOps.Iterator()
-
+	//fmt.Println(d.siteId, "asking local ops from index", index)
 	ok = it.Last()
 	if ok {
 		lastIndex = it.Key().(int)
+		lastOp := it.Value().(Op)
+		if lastIndex > index {
+			res = append(res, lastOp)
+		}
+		//fmt.Println(d.siteId, "lastIndex", lastIndex)
+
 		for it.Prev() {
 			ind := it.Key().(int)
 			op := it.Value().(Op)
@@ -332,7 +344,7 @@ func gobToLogState(gobState LogStateGob) map[string] *treemap.Map {
 	res := make(map[string] *treemap.Map)
 
 	for peer, intervals := range gobState {
-		inter := treemap.NewWith(intervalComparator)
+		inter := treemap.NewWith(IntervalComparator)
 
 		for _, interval := range intervals {
 			inter.Put(interval, nil)
@@ -359,6 +371,7 @@ func (d *SyncedDocument) LocalInsert(index int, val string) {
 		},
 	})
 
+	//fmt.Println(d.siteId, "local insert val", val, "index", index, "last index", d.lastLocalOpIndex)
 	d.lastLocalOpIndex++
 }
 
@@ -435,7 +448,43 @@ func (d *SyncedDocument) ApplyRemoteOp(op Op, aux interface{}) {
 	}
 }
 
-func (d *SyncedDocument) updateDocState(peerId utils.UUID, index int) {
+func AddIndexInIntervalTree(intervalTree *treemap.Map, newInterval Interval) {
+	before, _ := intervalTree.Floor(newInterval)
+
+	if before != nil {
+		b := before.(Interval)
+		if b.End >= newInterval.Start - 1{
+			newInterval.Start = b.Start
+			if newInterval.End < b.End {
+				newInterval.End = b.End
+			}
+			intervalTree.Remove(b)
+		}
+	}
+
+	for {
+		interval, _ := intervalTree.Ceiling(Interval{newInterval.Start + 1, -1})
+		if interval == nil {
+			break
+		}
+
+		i := interval.(Interval)
+
+		if i.Start - 1 <= newInterval.End {
+			if newInterval.End < i.End {
+				newInterval.End = i.End
+			}
+
+			intervalTree.Remove(i)
+		} else {
+			break
+		}
+	}
+
+	intervalTree.Put(newInterval, nil)
+}
+
+func (d *SyncedDocument) UpdateDocState(peerId utils.UUID, index int) {
 	newEntry := LogEntry {
 		PeerId:   peerId,
 		LogState: make(map[string] *treemap.Map),
@@ -445,7 +494,7 @@ func (d *SyncedDocument) updateDocState(peerId utils.UUID, index int) {
 		// copy interval treemap
 		lastEntry := d.log[len(d.log) - 1]
 		for peer, intervals := range lastEntry.LogState {
-			intervalMap := treemap.NewWith(intervalComparator)
+			intervalMap := treemap.NewWith(IntervalComparator)
 
 			it := intervals.Iterator()
 			for it.Next() {
@@ -458,34 +507,12 @@ func (d *SyncedDocument) updateDocState(peerId utils.UUID, index int) {
 
 	// merge intervals if necessary
 	newInterval := Interval{index, index}
-	var before, after interface{}
-	if state, ok := newEntry.LogState[string(peerId)]; ok {
-		before, _ = state.Floor(newInterval)
-		after, _ = state.Ceiling(newInterval)
-	} else {
-		newEntry.LogState[string(peerId)] = treemap.NewWith(intervalComparator)
+
+	if _, ok := newEntry.LogState[string(peerId)]; !ok {
+		newEntry.LogState[string(peerId)] = treemap.NewWith(IntervalComparator)
 	}
 
-	if before != nil {
-		beforeInterval := before.(Interval)
-		if beforeInterval.End == newInterval.Start - 1 {
-			newInterval.Start = beforeInterval.Start
-		}
-
-		newEntry.LogState[string(peerId)].Remove(beforeInterval)
-	}
-
-	if after != nil{
-		afterInterval := after.(Interval)
-
-		if newInterval.End == afterInterval.Start - 1 {
-			newInterval.End = afterInterval.End
-		}
-
-		newEntry.LogState[string(peerId)].Remove(afterInterval)
-	}
-
-	newEntry.LogState[string(peerId)].Put(newInterval, nil)
+	AddIndexInIntervalTree(newEntry.LogState[string(peerId)], newInterval)
 
 	d.log = append(d.log, newEntry)
 }
@@ -500,15 +527,18 @@ func (d *SyncedDocument) addToPeerOps(op Op) {
 		peerOps.Put(op.PeerOpIndex, op)
 		d.peerOps.Put(string(op.PeerId), peerOps)
 	}
+	//fmt.Println(d.siteId, "put op with index", op.PeerOpIndex, "for", string(op.PeerId))
 
-	d.updateDocState(op.PeerId, op.PeerOpIndex)
+	d.UpdateDocState(op.PeerId, op.PeerOpIndex)
 }
 
 func (d *SyncedDocument) updatePeerOps(op Op) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
+	//fmt.Println(d.siteId, "updating state")
 	d.addToPeerOps(op)
+	//fmt.Println(d.siteId, "new state:", d.getCurrentStateGob())
 }
 
 func peerOpsToGob(h *treemap.Map) map[string] map[int] Op {
@@ -576,23 +606,70 @@ func (d *SyncedDocument) GetDocument() crdt.Document {
 	return d.localDocument
 }
 
-
 type SyncedDocumentState struct {
-	State LogStateGob
+	PeerId string
+	State  LogStateGob
+}
+
+func (s SyncedDocumentState) NumberOfOps() int {
+	res := 0
+	for _, intervals := range s.State {
+		for _, inter := range intervals {
+			res += inter.End - inter.Start + 1
+		}
+	}
+
+	return res
+}
+
+func (s SyncedDocumentState) String() string {
+	res := ""
+	for peer, intervals := range s.State {
+		res += "\n{peer-" + peer + "} - ["
+		for _, inter := range intervals {
+			res += inter.String() + ", "
+		}
+		res += "]"
+	}
+
+	return res
 }
 
 type SyncedDocumentPatch struct {
+	PeerId string
 	Patch map[string] []Op
+}
+
+func (p SyncedDocumentPatch) NumberOfOps() int {
+	res := 0
+	for _, ops := range p.Patch {
+		res += len(ops)
+	}
+
+	return res
+}
+
+func (p SyncedDocumentPatch) String() string {
+	res := ""
+	for peer, ops := range p.Patch {
+		res += "\n{peer-" + peer + "} - ["
+		for _, op := range ops {
+			res += 	strconv.Itoa(op.PeerOpIndex) + ", "
+		}
+		res += "]"
+	}
+
+	return res
 }
 
 func (d *SyncedDocument) GetCurrentState() DocumentState {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	return d.getCurrentState()
+	return d.getCurrentStateGob()
 }
 
-func (d *SyncedDocument) getCurrentState() SyncedDocumentState {
+func (d *SyncedDocument) getCurrentStateGob() SyncedDocumentState {
 	s := SyncedDocumentState{}
 
 	lastEntry := LogEntry{}
@@ -601,6 +678,7 @@ func (d *SyncedDocument) getCurrentState() SyncedDocumentState {
 	}
 
 	s.State = logStateToGob(lastEntry.LogState)
+	s.PeerId = string(d.siteId)
 
 	return s
 }
@@ -662,15 +740,16 @@ func (d *SyncedDocument) CreatePatch(state DocumentState) Patch {
 	defer d.mu.Unlock()
 
 	s := state.(SyncedDocumentState)
-	curState := d.getCurrentState()
+	curState := d.getCurrentStateGob()
 	p := SyncedDocumentPatch{}
 	p.Patch = make(map[string] []Op)
-
+	//fmt.Println(d.siteId, "received state from peer", s.PeerId, s)
 	for peer, curIntervals := range curState.State {
 
 		intervals, ok := s.State[peer]
 
 		if !ok {
+			//fmt.Println(d.siteId, "received state is missing everything for peer", peer)
 			p.Patch[peer] = []Op{}
 			m, ok := d.peerOps.Get(peer)
 			if !ok {
@@ -678,17 +757,26 @@ func (d *SyncedDocument) CreatePatch(state DocumentState) Patch {
 			}
 
 			ops := m.(*treemap.Map)
-			for _, curInterval := range curIntervals {
-				for i := curInterval.Start; i <= curInterval.End; i++ {
-					op, ok := ops.Get(i)
-					if !ok {
-						panic ("invalid op index for peer")
-					}
-					p.Patch[peer] = append(p.Patch[peer], op.(Op))
-				}
+
+			it := ops.Iterator()
+			for it.Next() {
+				p.Patch[peer] = append(p.Patch[peer], it.Value().(Op))
 			}
+
+			//fmt.Println(d.siteId, ": i have", len(p.Patch[peer]), "operations for peer", peer)
+			//
+			//total := 0
+			//for _, curInterval := range curIntervals {
+			//	fmt.Println(d.siteId, "interval", curInterval, "for peer", peer)
+			//	for i := curInterval.Start; i <= curInterval.End; i++ {
+			//		total++
+			//	}
+			//}
+			//
+			//fmt.Println(d.siteId, ": total ops for peer", peer, "from intervals", total)
 		} else {
 			missingIndices := FindMissingIndices(intervals, curIntervals)
+			//fmt.Println(d.siteId, "received state is missing indices", missingIndices, "for peer", peer)
 			if len(missingIndices) > 0 {
 				p.Patch[peer] = []Op{}
 				m, ok := d.peerOps.Get(peer)
@@ -708,12 +796,16 @@ func (d *SyncedDocument) CreatePatch(state DocumentState) Patch {
 		}
 	}
 
+	p.PeerId = string(d.siteId)
+	//fmt.Println(d.siteId, "generating patch of size", p.NumberOfOps())
+	//fmt.Println(d.siteId, "generated patch", p, "for peer", s.PeerId)
 	return p
 }
 
 func (d *SyncedDocument) ApplyPatch(patch Patch) {
 	p := patch.(SyncedDocumentPatch)
 
+	//fmt.Println(d.siteId, "applying patch of size", p.NumberOfOps(), p, "from", p.PeerId)
 	for _, ops := range p.Patch {
 		for _, op := range ops {
 			d.ApplyRemoteOp(op, nil)
