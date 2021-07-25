@@ -41,36 +41,42 @@
 	<link rel="stylesheet" type="text/css" href="css/index.css">
 	<script src="lib/codemirror.js"></script>
 
-	<div>
-		<a href="/" id="home">Home</a>
+	<div class="button-container">
+		<div class="control-panel">
+			<a class="hvr-grow button" style="background: linear-gradient(262.65deg,#6ee2e2,#5a8bff);" onclick="openNewDoc()">New</a>
+			<a class="hvr-grow button" style="background: linear-gradient(262.65deg,#144680,#6ee2e2)" onclick="openFileChooser()">
+				<input type="file" id="inputElement" style="background-color: #cdb38a">
+				Open Local File
+			</a>
+
+			<a class="hvr-grow button" style="background: #a278ad linear-gradient(262.65deg,#6ee2e2,#144680)" onclick="saveLocal()">Save</a>
+			<a class="hvr-grow button" style="background: #5a8bff linear-gradient(98.35deg,#6ee2e2,#5a8bff)" onclick="closeDoc()">Close</a>
+		</div>
+
+		<div id="peer-id">peer id</div>
+		<div class="demo-buttons">
+			<span class="connection"></span>
+			<a class="hvr-grow button" style="background-color: #bd717d" onclick="disconnect()">Disconnect</a>
+			<a class="hvr-grow button" style="background-color: #71ad73" onclick="reconnect()">Reconnect</a>
+		</div>
 	</div>
 
 	<br/>
 
-	<div>
-		<text id="peer">peer id</text>
-		<span class="connection"></span>
-		<button type="button" class="btn btn-white btn-animate round-button" style="background-color: #bd717d" onclick="disconnect()">Disconnect</button>
-		<button type="button" class="btn btn-white btn-animate round-button" style="background-color: #71ad73" onclick="reconnect()">Reconnect</button>
+	<div class="editor-container">
+
+		<div class="editor">
+			<label for="collaborative-text-editor"></label>
+			<textarea id="collaborative-text-editor" name="text-editor" rows="4" cols="50"></textarea>
+		</div>
+
+		<div class="peer-panel-wrapper">
+			<div class="peer-panel"><ul id="connected-peers"></ul></div>
+		</div>
+
 	</div>
 
-	<br/>
-
-	<div>
-		<button type="button" class="btn btn-white btn-animate round-button" style="background-color: #5a779c" onclick="openNewDoc()">New</button>
-		<input type="file" id="inputElement" style="background-color: #cdb38a">
-		<button type="button" class="btn btn-white btn-animate round-button" style="background-color: #a278ad" onclick="saveLocal()">Save</button>
-		<button type="button" class="btn btn-white btn-animate round-button" style="background-color: #d5d993" onclick="closeDoc()">Close</button>
-	</div>
-
-	<br/>
-
-	<div class="main">
-		<label for="collaborative-text-editor"></label>
-		<textarea id="collaborative-text-editor" name="text-editor" class="main1" rows="4" cols="50"></textarea>
-		<div class="main2"><ul id="connected-peers" class="main2"></ul></div>
-	</div>
-
+	<div class="loader-background"></div>
 	<div class="loader"></div>
 
 	<script src="js/editor.js"></script>

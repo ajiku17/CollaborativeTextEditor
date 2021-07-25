@@ -7,6 +7,22 @@
     animation: spin 2s linear infinite;
     margin: auto;
     display: none;
+    z-index: 25;
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+}
+
+.loader-background {
+    z-index: 20;
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    background: #151515
 }
 
 @keyframes spin {

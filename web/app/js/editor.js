@@ -28,17 +28,13 @@ function enableEditor() {
 }
 
 function enableLoading() {
-    document.querySelectorAll('div:not(.loader)').forEach(function(currentValue, currentIndex, listObj) {
-        currentValue.style.display = 'none';
-    })
     document.getElementsByClassName('loader').item(0).style.display = 'block'
+    document.getElementsByClassName('loader-background').item(0).style.display = 'block'
 }
 
 function disableLoading() {
-    document.querySelectorAll('div:not(.loader)').forEach(function(currentValue, currentIndex, listObj) {
-        currentValue.style.display = 'block';
-    })
     document.getElementsByClassName('loader').item(0).style.display = 'none'
+    document.getElementsByClassName('loader-background').item(0).style.display = 'none'
 }
 
 function connectionChanged(connected) {
@@ -231,6 +227,10 @@ function initCallback(initialText) {
 
 const inputElement = document.getElementById("inputElement")
 
+function openFileChooser() {
+    inputElement.click()
+}
+
 inputElement.onchange = (e) => {
     const file = inputElement.files[0]
     if (!file) return
@@ -281,7 +281,4 @@ function initJS() {
     enableButtons()
 }
 
-// run()
 initJS()
-
-// setTimeout(parseReq, 3000)

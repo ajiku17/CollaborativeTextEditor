@@ -1,26 +1,121 @@
 body {
-    background-color: #a7b1c7;
+    background-color: #151515;
 }
 
-.main {
+html,body { height: 95%; }
+
+.editor {
+    width: 80%;
     display: inline-block;
+}
+
+.peer-panel-wrapper {
+    width: 20%;
+    padding-left: 3px;
+    position: relative;
+    background: linear-gradient(180deg,#6ee2e2,#5a8bff);
+    margin: 0;
+    display: grid;
+    place-items: center;
+}
+
+.peer-panel {
+    width: 100%;
+    height: 100%;
+    display: inline-block;
+    background-color: #151515;
+}
+
+li {
+    color: white;
+}
+
+.editor-container {
+    display: flex;
+    flex-direction: row;
+    height: 95%;
+    width: 95%;
+}
+
+textarea{
+    width: 100%;
+}
+
+.cm-s-base16-dark.CodeMirror {
+    width: 100%;
+    height: 100%;
+}
+
+input[type="file"] {
+    display: none;
+}
+
+.button-container {
+    margin-top: 10px;
+    display: flex;
     justify-content: space-between;
-    /*border: 1px solid red;*/
 }
-.main1 {
-    float: left;
+
+.control-panel {
+    display: inline-block;
 }
-.main2 {
-    float: right;
-    /*text-align: center;*/
+
+.demo-buttons {
+    text-align: center;
+    display: inline-block;
+}
+
+#peer-id {
+    margin: auto;
+    color: white;
+    font-size: 20pt;
+    font-family:'Roboto',sans-serif;
+    font-weight:500;
 }
 
 .connection {
-    height: 25px;
-    width: 25px;
+    height: 24px;
+    width: 24px;
     background-color: #00bb00;
     border-radius: 50%;
     display: inline-block;
+    margin: auto;
+}
+
+.button {
+    background-color: #04AA6D;
+    border: none;
+    color: white;
+    padding: 20px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin: 4px 2px;
+    border-radius: 15px;
+    font-family:'Roboto',sans-serif;
+    font-weight:700;
+}
+
+.hvr-grow:hover, .hvr-grow:focus, .hvr-grow:active {
+    -webkit-transform: scale(1.1);
+    transform: scale(1.1);
+}
+.hvr-grow {
+    display: inline-block;
+    vertical-align: middle;
+    -webkit-transform: perspective(1px) translateZ(0);
+    transform: perspective(1px) translateZ(0);
+    box-shadow: 0 0 1px rgba(0, 0, 0, 0);
+    -webkit-transition-duration: 0.3s;
+    transition-duration: 0.3s;
+    -webkit-transition-property: transform;
+    transition-property: transform;
+}
+
+.a {
+    font-family:'Roboto',sans-serif;
+    font-weight:300;
 }
 
 .round-button{
@@ -67,7 +162,6 @@ body {
     transform: translateY(-1px);
     box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
 }
-
 
 .btn::after {
     content: "";
