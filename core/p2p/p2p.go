@@ -32,7 +32,7 @@ type P2P struct {
 
 	peerConnectionCallback        PeerConnectionCallback
 	peerConnectionRequestCallback PeerConnectionRequestCallback
-	peerDisconnectionCallback PeerDisconnectionCallback
+	peerDisconnectionCallback     PeerDisconnectionCallback
 
 	inbound  chan []byte
 	outbound chan []byte
@@ -80,6 +80,10 @@ func (p *P2P) OnPeerDisconnection(callback PeerDisconnectionCallback) {
 }
 
 func (p *P2P) Start() error {
+	p.mu.Lock()
+	p.stopped = false
+	p.mu.Unlock()
+
 	err := p.signal.Dial()
 	if err != nil {
 		fmt.Println("p2p signaling dial error:", err)
@@ -100,8 +104,7 @@ func (p *P2P) Stop() {
 	defer p.mu.Unlock()
 
 	p.stopped = true
-	fmt.Println("peerDisconnectionCallback  in Stop()", p.peerId)
-	p.peerDisconnectionCallback(p.peerId, nil, nil)
+	p.signal.Close()
 }
 
 func (p *P2P) receiver() {
@@ -115,12 +118,11 @@ func (p *P2P) receiver() {
 			return
 		}
 
-		message, err := p.signal.NextMessage()
+		message, err := p.signal.NextMessageTimeout(2 * time.Second)
 		if err != nil {
 			fmt.Println("p2p receiver error", err)
 			continue
 		}
-
 		p.inbound <- message
 	}
 }
@@ -154,12 +156,24 @@ func (p *P2P) sender() {
 
 func (p *P2P) msgProcessor(errc chan error) {
 	for {
-		msg := <- p.inbound
+		p.mu.Lock()
+		stopped := p.stopped
+		p.mu.Unlock()
 
-		err := p.processMsg(msg)
-		if err != nil {
-			errc <- err
+		if stopped {
 			return
+		}
+
+		timer := time.After(2 * time.Second)
+
+		select {
+		case msg := <-p.inbound:
+			err := p.processMsg(msg)
+			if err != nil {
+				errc <- err
+				return
+			}
+		case <- timer:
 		}
 	}
 }
@@ -191,6 +205,7 @@ func (p *P2P) processMsg(msg []byte) error {
 			fmt.Println("invalid ConnAnswer", m.Msg)
 			return err
 		}
+		//fmt.Println(p.peerId, "received answer from ", answer.Sender)
 		err = p.dispatchMsg(answer.Sender, answer)
 	case ICE_CANDIDATE:
 		//fmt.Println(p.peerId, "received ice candidate from signaling server")
@@ -200,6 +215,7 @@ func (p *P2P) processMsg(msg []byte) error {
 			fmt.Println("invalid IceCandidateMsg", m.Msg)
 			return err
 		}
+		//fmt.Println(p.peerId, "received ice from ", icecandidate.Sender)
 		err = p.dispatchMsg(icecandidate.Sender, icecandidate)
 	}
 
@@ -363,6 +379,7 @@ func (p *P2P) setupConn(peer *PeerConn, peerId string, inboundSignals chan inter
 	if err != nil {
 		panic(err)
 	}
+	fmt.Println(peer.GetEndpoint(), " on creation connection state", peer.Conn.ConnectionState().String())
 
 	// When an ICE candidate is available send to the other Pion instance
 	// the other Pion instance will add this candidate by calling AddICECandidate
@@ -385,7 +402,7 @@ func (p *P2P) setupConn(peer *PeerConn, peerId string, inboundSignals chan inter
 	peer.OnICECandidateReceived(func (msg ICECandidateMsg) {
 		zeroVal := uint16(0)
 		emptyStr := ""
-		//fmt.Println("adding ice candidate in", p.peerId)
+		fmt.Println("adding ice candidate in", p.peerId)
 		if candidateErr := peer.Conn.AddICECandidate(webrtc.ICECandidateInit{Candidate: msg.IceCandidate, SDPMid: &emptyStr, SDPMLineIndex: &zeroVal});
 			candidateErr != nil {
 			panic(candidateErr)
@@ -417,15 +434,21 @@ func (p *P2P) setupConn(peer *PeerConn, peerId string, inboundSignals chan inter
 	// Set the handler for Peer connection state
 	// This will notify you when the peer has connected/disconnected
 	peer.Conn.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
-		fmt.Printf("%s Peer Connection State has changed: %s\n", p.peerId, s.String())
+		fmt.Printf("%s Peer Connection State for %v has changed: %s\n", p.peerId, peer.GetEndpoint(), s.String())
 
-		if s == webrtc.PeerConnectionStateDisconnected {
-			fmt.Println("peerDisconnectionCallback  in ONConnectionStateChange()", p.peerId)
-			p.peerDisconnectionCallback(p.peerId, nil, nil)
-		}
+		if s == webrtc.PeerConnectionStateDisconnected ||
+			s == webrtc.PeerConnectionStateFailed ||
+			s == webrtc.PeerConnectionStateClosed {
 
-		if s != webrtc.PeerConnectionStateConnected && s != webrtc.PeerConnectionStateConnecting{
 			errc <- fmt.Errorf(s.String())
+
+			p.mu.Lock()
+			delete(p.msgQueues, peer.endpointId)
+			p.mu.Unlock()
+
+			if p.peerDisconnectionCallback != nil {
+				p.peerDisconnectionCallback(peer.GetEndpoint(), peer, nil)
+			}
 		}
 	})
 
@@ -436,7 +459,7 @@ func (p *P2P) setupConn(peer *PeerConn, peerId string, inboundSignals chan inter
 
 	// Register channel opening handling
 	peer.Channel.OnOpen(func() {
-		//fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", peer.Channel.Label(), peer.Channel.ID())
+		fmt.Printf("Data channel '%s'-'%d' open.\n", p.peerId, peer.endpointId)
 		errc <- nil
 	})
 
@@ -511,6 +534,8 @@ func (p *P2P) connectionRequested (offer ConnOffer) {
 		panic(err)
 	}
 
+	//fmt.Println(peer.GetEndpoint(), " on creation connection state", peer.Conn.ConnectionState().String())
+
 	// When an ICE candidate is available send to the other Pion instance
 	// the other Pion instance will add this candidate by calling AddICECandidate
 	peer.Conn.OnICECandidate(func(c *webrtc.ICECandidate) {
@@ -541,15 +566,21 @@ func (p *P2P) connectionRequested (offer ConnOffer) {
 	// Set the handler for Peer connection state
 	// This will notify you when the peer has connected/disconnected
 	peer.Conn.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
-		fmt.Printf("%s Peer Connection State has changed: %s\n", p.peerId, s.String())
+		fmt.Printf("%s Peer Connection State for %v has changed: %s\n", p.peerId, peer.GetEndpoint(), s.String())
 
-		if s == webrtc.PeerConnectionStateDisconnected {
-			fmt.Println("peerDisconnectionCallback  in ONConnectionStateChange2()", p.peerId)
-			p.peerDisconnectionCallback(p.peerId, nil, nil)
-		}
+		if s == webrtc.PeerConnectionStateDisconnected ||
+			s == webrtc.PeerConnectionStateFailed ||
+			s == webrtc.PeerConnectionStateClosed {
 
-		if s != webrtc.PeerConnectionStateConnected && s != webrtc.PeerConnectionStateConnecting{
 			errc <- fmt.Errorf(s.String())
+
+			p.mu.Lock()
+			delete(p.msgQueues, peer.endpointId)
+			p.mu.Unlock()
+
+			if p.peerDisconnectionCallback != nil {
+				p.peerDisconnectionCallback(peer.GetEndpoint(), peer, nil)
+			}
 		}
 	})
 
@@ -557,6 +588,8 @@ func (p *P2P) connectionRequested (offer ConnOffer) {
 		peer.Channel = d
 
 		d.OnOpen(func() {
+			//fmt.Printf("Data channel '%s'-'%s' open.\n", p.peerId, peer.endpointId)
+
 			errc <- nil
 		})
 
@@ -612,4 +645,46 @@ func (p *P2P) connectionRequested (offer ConnOffer) {
 	}
 
 	return
+}
+
+func (p *P2P) RemoveConn(peerId string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	delete (p.msgQueues, peerId)
+}
+
+func (p *P2P) handleSignals(peer *PeerConn, msgQueue chan interface{}, errc chan error) {
+	//fmt.Println(m.peerId, "handling signals from", p.GetEndpoint(), "answer callback: ", p.onConnAnswerCallback)
+	for {
+		peer.mu.Lock()
+		stopped := p.stopped
+		peer.mu.Unlock()
+
+		if stopped {
+			return
+		}
+
+		timer := time.After(10 * time.Second)
+
+		select {
+		case msg := <- msgQueue:
+			//fmt.Println(m.peerId, "received data from", p.endpointId)
+
+			switch msg.(type) {
+			case ICECandidateMsg:
+				//fmt.Println("received ice candidate message", msg)
+				peer.onICECandidateCallback(msg.(ICECandidateMsg))
+			case ConnAnswer:
+				//fmt.Println("received answer")
+				peer.onConnAnswerCallback(msg.(ConnAnswer))
+			case ConnRefuse:
+				//fmt.Println("connection refused")
+				errc <- fmt.Errorf("connection refused")
+			}
+		case <- timer:
+			//fmt.Println("peer signal timer fired off")
+			continue
+		}
+	}
 }

@@ -66,18 +66,13 @@ type SyncedDocument struct {
 	lastLocalOpIndex int
 
 	onChange         ChangeListener
-	OnPeerConnect    PeerConnectedListener
-	OnPeerDisconnect PeerDisconnectedListener
 
 	killed bool
 	mu     sync.Mutex
 }
 
-func (d *SyncedDocument) ConnectSignals(changeListener ChangeListener,
-	peerConnectedListener PeerConnectedListener,
-	peerDisconnectedListener PeerDisconnectedListener) {
-
-	d.setListeners(changeListener, peerConnectedListener, peerDisconnectedListener)
+func (d *SyncedDocument) ConnectSignals(changeListener ChangeListener) {
+	d.setListeners(changeListener)
 }
 
 func initDocState(d *SyncedDocument) {
@@ -90,13 +85,9 @@ func initDocState(d *SyncedDocument) {
 	d.peerOps = treemap.NewWith(utils2.StringComparator)
 }
 
-func (d *SyncedDocument) setListeners(changeListener ChangeListener,
-	peerConnectedListener PeerConnectedListener,
-	peerDisconnectedListener PeerDisconnectedListener) {
+func (d *SyncedDocument) setListeners(changeListener ChangeListener) {
 
 	setChangeListener(d, changeListener)
-	setPeerConnectedListener(d, peerConnectedListener)
-	setPeerDisconnectedListener(d, peerDisconnectedListener)
 }
 
 func registerTypes() {
@@ -112,14 +103,6 @@ func registerTypes() {
 	gob.Register(MessageDelete{})
 	gob.Register(MessageCRDTDelete{})
 	gob.Register(MessagePeerCursor{})
-}
-
-func setPeerDisconnectedListener(d *SyncedDocument, listener PeerDisconnectedListener) {
-	d.OnPeerDisconnect = listener
-}
-
-func setPeerConnectedListener(d *SyncedDocument, listener PeerConnectedListener) {
-	d.OnPeerConnect = listener
 }
 
 func setChangeListener(d *SyncedDocument, listener ChangeListener) {
@@ -263,14 +246,6 @@ func (d *SyncedDocument) GetSiteID() utils.UUID {
 
 func (d *SyncedDocument) SetChangeListener(listener ChangeListener) {
 	setChangeListener(d, listener)
-}
-
-func (d *SyncedDocument) SetPeerConnectedListener(listener PeerConnectedListener) {
-	setPeerConnectedListener(d, listener)
-}
-
-func (d *SyncedDocument) SetPeerDisconnectedListener(listener PeerDisconnectedListener) {
-	setPeerDisconnectedListener(d, listener)
 }
 
 func (d *SyncedDocument) Serialize() ([]byte, error) {

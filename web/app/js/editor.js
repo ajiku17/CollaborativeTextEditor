@@ -20,7 +20,7 @@ function enableButtons() {
 }
 
 function disableEditor() {
-    editor.options.readOnly = true
+    editor.options.readOnly = 'nocursor'
 }
 
 function enableEditor() {
@@ -156,7 +156,6 @@ function removePeer(peerId) {
 
 }
 
-
 function pushState(docId) {
     var path = '?doc=' + docId
     console.log('pushing state ' + path);
@@ -169,6 +168,11 @@ function popState() {
 
 function openNewDoc() {
     editor.setValue("")
+    if (docId !== -1) {
+        DocumentClose(docId)
+        editor.setValue("")
+    }
+
     DocumentNew(onDocChange, onPeerConnect, onPeerDisconnect, documentLoaded)
 }
 
@@ -178,6 +182,11 @@ function saveLocal() {
 }
 
 function openDocById(id) {
+    if (docId !== -1) {
+        DocumentClose(docId)
+        editor.setValue("")
+    }
+
     DocumentOpen(id, initCallback, onDocChange, onPeerConnect, onPeerDisconnect, documentLoaded)
 }
 
@@ -228,6 +237,10 @@ inputElement.onchange = (e) => {
     const reader = new FileReader()
     reader.onload = (e) => {
         const textContent = e.target.result
+        if (docId !== -1) {
+            DocumentClose(docId)
+            editor.setValue("")
+        }
         docId = DocumentDeserialize(Uint8Array.from(textContent.split(",").map(function (item) {
             return parseInt(item, 10)
         })), initCallback, onDocChange, onPeerConnect, onPeerDisconnect, documentLoaded)

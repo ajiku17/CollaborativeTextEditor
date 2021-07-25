@@ -10,7 +10,6 @@ import (
 	"time"
 )
 
-
 const STUN_URL = "stun:stun.l.google.com:19302"
 
 type P2PManager struct {
@@ -29,50 +28,46 @@ type P2PManager struct {
 	inbound  chan P2PMessage
 	outbound chan P2PMessage
 
+	onPeerConnectCallback    PeerConnectedListener
+	onPeerDisconnectCallback PeerDisconnectedListener
+
 	stopped bool
 	killed bool
 	mu sync.Mutex
 }
 
-func NewP2PManager(siteId utils.UUID, doc synceddoc.Document, signalingURL string, track *tracker.Client) Manager {
-	m := new(P2PManager)
-
-	m.id = siteId
-	m.doc = doc
-	m.stopped = false
-	m.killed = false
-
-	m.signalingURL = signalingURL
-	m.trackerC = track
-
-	m.inbound = make(chan P2PMessage, 100)
-	m.outbound = make(chan P2PMessage, 100)
-
-	m.conns = make(map[*p2p.PeerConn]struct{})
-
-	return m
+func (p *P2PManager) OnPeerConnect(callback PeerConnectedListener) {
+	setPeerConnectedListener(p, callback)
 }
 
-func (m *P2PManager) GetId() utils.UUID {
-	return m.id
+func (p *P2PManager) OnPeerDisconnect(callback PeerDisconnectedListener) {
+	setPeerDisconnectedListener(p, callback)
 }
 
-func (m *P2PManager) Start() {
-	m.stopped = false
+func (p *P2PManager) ConnectSignals(peerConnectedListener PeerConnectedListener,
+	peerDisconnectedListener PeerDisconnectedListener) {
 
+	p.setListeners(peerConnectedListener, peerDisconnectedListener)
+}
+
+func (p *P2PManager) setListeners(peerConnectedListener PeerConnectedListener,
+	peerDisconnectedListener PeerDisconnectedListener) {
+
+	setPeerConnectedListener(p, peerConnectedListener)
+	setPeerDisconnectedListener(p, peerDisconnectedListener)
+}
+
+func setPeerDisconnectedListener(p *P2PManager, listener PeerDisconnectedListener) {
+	p.onPeerDisconnectCallback = listener
+}
+
+func setPeerConnectedListener(p *P2PManager, listener PeerConnectedListener) {
+	p.onPeerConnectCallback = listener
+}
+
+func (m *P2PManager) setupP2P() {
 	m.p2p = p2p.New(m.signalingURL, string(m.id), STUN_URL)
 
-	peers, err := m.trackerC.RegisterAndGet(string(m.doc.GetID()), string(m.id))
-	if err != nil {
-		fmt.Println("P2P manager: error registering and getting from tracker", err)
-	}
-
-	peers, err = m.trackerC.Get(string(m.doc.GetID()))
-	if err != nil {
-		fmt.Println("P2P manager: error registering and getting from tracker", err)
-	}
-
-	// Setup p2p
 	m.p2p.OnPeerConnectionRequest(func(conn *p2p.PeerConn, offer p2p.ConnOffer, aux interface{}) {
 		conn.OnMessage(func (msg []byte) {
 			p2pMsg, err := DecodeP2PMessage(msg)
@@ -84,7 +79,7 @@ func (m *P2PManager) Start() {
 	})
 
 	m.p2p.OnPeerConnection(func(endpointPeerId string, conn *p2p.PeerConn, aux interface{}) {
-		//fmt.Println(m.p2p.GetPeerId(), "received a connection from ", conn.GetEndpoint())
+		fmt.Println(m.p2p.GetPeerId(), "received a connection from ", conn.GetEndpoint())
 
 		m.connsMu.Lock()
 		defer m.connsMu.Unlock()
@@ -103,14 +98,59 @@ func (m *P2PManager) Start() {
 			State:    docState,
 		}
 
-
-		m.doc.(*synceddoc.SyncedDocument).OnPeerConnect(utils.UUID(endpointPeerId), 0, nil)
-
+		if m.onPeerConnectCallback != nil {
+			m.onPeerConnectCallback(utils.UUID(endpointPeerId), 0, nil)
+		}
 	})
 
 	m.p2p.OnPeerDisconnection(func(endpointPeerId string, conn *p2p.PeerConn, aux interface{}) {
-		m.doc.(*synceddoc.SyncedDocument).OnPeerDisconnect(utils.UUID(endpointPeerId), nil)
+		m.connsMu.Lock()
+		//conn.Close()
+		delete(m.conns, conn)
+		m.connsMu.Unlock()
+
+		if m.onPeerDisconnectCallback != nil {
+			m.onPeerDisconnectCallback(utils.UUID(endpointPeerId), nil)
+		}
 	})
+}
+
+func NewP2PManager(siteId utils.UUID, doc synceddoc.Document, signalingURL string, track *tracker.Client) Manager {
+	m := new(P2PManager)
+
+	m.id = siteId
+	m.doc = doc
+	m.killed = false
+
+	m.signalingURL = signalingURL
+	m.trackerC = track
+
+	m.inbound = make(chan P2PMessage, 100)
+	m.outbound = make(chan P2PMessage, 100)
+
+	m.conns = make(map[*p2p.PeerConn]struct{})
+
+	m.setupP2P()
+
+	return m
+}
+
+func (m *P2PManager) GetId() utils.UUID {
+	return m.id
+}
+
+func (m *P2PManager) Start() {
+	m.stopped = false
+
+	err := m.trackerC.Register(string(m.doc.GetID()), string(m.id))
+	if err != nil {
+		fmt.Println("P2P manager: error registering and getting from tracker", err)
+	}
+
+	peers, err := m.trackerC.Get(string(m.doc.GetID()))
+	if err != nil {
+		fmt.Println("P2P manager: error registering and getting from tracker", err)
+	}
 
 	err = m.p2p.Start()
 	if err != nil {
@@ -143,17 +183,15 @@ func (m *P2PManager) Start() {
 			//wg.Done()
 
 			if err != nil {
-				//fmt.Println(m.id, "P2P manager: error while setting up connection with", conn.GetEndpoint(), err)
+				fmt.Println(m.id, "P2P manager: error while setting up connection with", conn.GetEndpoint(), err)
 				return
 			}
-
 
 			m.connsMu.Lock()
 			m.conns[conn] = struct{}{} // save newly setup connection
 			m.connsMu.Unlock()
 
 			//fmt.Println(m.id, "sending patch request to newly established", conn.GetEndpoint())
-
 		} (p)
 	}
 
@@ -164,7 +202,7 @@ func (m *P2PManager) Start() {
 }
 
 func (m *P2PManager) startSynchronizer() {
-	fmt.Println("starting startSynchronizer")
+	fmt.Println("starting synchronizer")
 	go m.changeMonitor()
 	go m.sender()
 	go m.requestProcessor()
@@ -173,12 +211,12 @@ func (m *P2PManager) startSynchronizer() {
 
 func (m *P2PManager) backgroundSync() {
 	for {
-		var killed bool
+		var stopped bool
 		m.mu.Lock()
-		killed = m.killed
+		stopped = m.stopped
 		m.mu.Unlock()
 
-		if killed {
+		if stopped {
 			fmt.Println(m.id, "background sync has been killed")
 			return
 		}
@@ -202,11 +240,11 @@ func (m *P2PManager) changeMonitor() {
 	lastChangeIndex := -1
 	//fmt.Println(m.id, "starting change monitor")
 	for {
-		var killed bool
+		var stopped bool
 		m.mu.Lock()
-		killed = m.killed
+		stopped = m.stopped
 		m.mu.Unlock()
-		if killed {
+		if stopped {
 			fmt.Println(m.id, "change monitor has been killed")
 			return
 		}
@@ -239,17 +277,17 @@ func (m *P2PManager) changeMonitor() {
 
 func (m *P2PManager) sender () {
 	for {
-		var killed bool
+		var stopped bool
 		m.mu.Lock()
-		killed = m.killed
+		stopped = m.stopped
 		m.mu.Unlock()
 
-		if killed {
+		if stopped {
 			fmt.Println(m.id, "sender has been killed")
 			return
 		}
 
-		timer := time.After(5 * time.Second)
+		timer := time.After(2 * time.Second)
 
 		select {
 		case msg := <- m.outbound:
@@ -260,7 +298,7 @@ func (m *P2PManager) sender () {
 			}
 
 		case <- timer:
-			fmt.Println(m.id, "sender timer fired off")
+			//fmt.Println(m.id, "sender timer fired off")
 		}
 	}
 }
@@ -304,28 +342,17 @@ func (m *P2PManager) sendToConn(conn *p2p.PeerConn, msg P2PMessage) {
 
 func (m *P2PManager) requestProcessor () {
 	for {
-		fmt.Println("Request processed by p2p manager ", m.stopped)
-
-
+		var stopped bool
 		m.mu.Lock()
-		stopped := m.stopped
+		stopped = m.stopped
 		m.mu.Unlock()
+
 		if stopped {
-			continue
-		}
-
-		var killed bool
-		m.mu.Lock()
-		killed = m.killed
-		m.mu.Unlock()
-
-		if killed {
 			fmt.Println(m.id, "receiver has been killed")
 			return
 		}
 
-		timer := time.After(5 * time.Second)
-
+		timer := time.After(2 * time.Second)
 		select {
 		case msg := <- m.inbound:
 			sendRsp, response, err := m.processRequest(msg)
@@ -339,7 +366,7 @@ func (m *P2PManager) requestProcessor () {
 			}
 
 		case <- timer:
-			fmt.Println(m.id, "receiver timer fired off")
+			//fmt.Println(m.id, "receiver timer fired off")
 		}
 	}
 }
@@ -379,13 +406,41 @@ func (m *P2PManager) processRequest(msg P2PMessage) (bool, P2PMessage, error) {
 }
 
 func (m *P2PManager) Stop() {
+	fmt.Println("p2p manager stopping")
+	m.mu.Lock()
 	m.stopped = true
+	m.mu.Unlock()
+
 	m.p2p.Stop()
+
+	m.killConnections()
 }
 
 func (m *P2PManager) Kill() {
+	m.mu.Lock()
+	m.stopped = true
+	m.killed = true
+	m.mu.Unlock()
+
+	m.killConnections()
+}
+
+func (m *P2PManager) killConnections() {
 	m.connsMu.Lock()
 	defer m.connsMu.Unlock()
 
-	m.killed = true
+	for conn := range m.conns {
+		err := conn.Close()
+		if err != nil {
+			fmt.Println("error closing connection with", conn.GetEndpoint(), "error:", err)
+		}
+
+		if m.onPeerDisconnectCallback != nil {
+			go m.onPeerDisconnectCallback(utils.UUID(conn.GetEndpoint()), nil)
+		}
+
+		m.p2p.RemoveConn(conn.GetEndpoint())
+	}
+
+	m.conns = make(map[*p2p.PeerConn] struct{})
 }

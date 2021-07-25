@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"nhooyr.io/websocket"
+	"time"
 )
 
 type Client struct {
@@ -53,12 +54,51 @@ func (c *Client) Close() error {
 	return nil
 }
 
+func (c *Client) NextMessageChannel() (chan []byte, chan error) {
+	errc := make(chan error, 1)
+	msgCh := make(chan []byte, 1)
+
+	go func (c *Client, msgCh chan []byte, errc chan error) {
+		msg, err := c.NextMessage()
+		if err != nil {
+			errc <- err
+			return
+		}
+
+		msgCh <- msg
+	} (c, msgCh, errc)
+
+	return msgCh, errc
+}
+
 func (c *Client) NextMessage() ([]byte, error) {
 	if c.c == nil {
 		return nil, fmt.Errorf("client connection is nil")
 	}
 
 	ctx := context.Background()
+
+	typ, data, err := c.c.Read(ctx)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if typ != websocket.MessageBinary {
+		c.c.Close(websocket.StatusUnsupportedData, "expected text data")
+		return nil, fmt.Errorf("expected text message but got %v", typ)
+	}
+
+	return data, nil
+}
+
+func (c *Client) NextMessageTimeout(timeout time.Duration) ([]byte, error) {
+	if c.c == nil {
+		return nil, fmt.Errorf("client connection is nil")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
 
 	typ, data, err := c.c.Read(ctx)
 

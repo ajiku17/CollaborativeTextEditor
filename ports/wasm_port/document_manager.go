@@ -46,11 +46,11 @@ func (manager *DocumentManager) GetDocument(docId DocumentID) (Document, error) 
 }
 
 func (manager *DocumentManager) RemoveDocument(docId DocumentID) {
-	d, ok := manager.openDocuments[docId]
-	if ok {
-		d.NetManager.Stop()
-		d.Doc.Close()
-	}
+	//d, ok := manager.openDocuments[docId]
+	//if ok {
+	//	d.NetManager.Stop()
+	//	d.Doc.Close()
+	//}
 	delete(manager.openDocuments, docId)
 }
 

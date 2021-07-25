@@ -3,7 +3,7 @@ package tracker
 import "sync"
 
 type Table struct {
-	table map[string] []string
+	table map[string] map[string] struct {}
 	mu    sync.Mutex
 }
 
@@ -11,24 +11,28 @@ func (t *Table) Register (docId string, addr string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	peers, ok := t.table[docId]
+	_, ok := t.table[docId]
 	if !ok {
-		peers = []string{}
+		t.table[docId] = make(map[string] struct{})
 	}
 
-	t.table[docId] = append(peers, addr)
+	t.table[docId][addr] = struct{}{}
 }
 func (t *Table) RegisterAndGet (docId string, addr string) []string {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	peers, ok := t.table[docId]
+	_, ok := t.table[docId]
 	if !ok {
-		peers = []string{}
+		t.table[docId] = make(map[string] struct{})
 	}
 
-	peers = append(peers, addr)
-	t.table[docId] = peers
+	t.table[docId][addr] = struct{}{}
+
+	peers := []string {}
+	for p := range t.table[docId] {
+		peers = append(peers, p)
+	}
 
 	return peers
 }
@@ -37,9 +41,9 @@ func (t *Table) Get (docId string) []string {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	peers, ok := t.table[docId]
-	if !ok {
-		peers = []string{}
+	peers := []string {}
+	for p := range t.table[docId] {
+		peers = append(peers, p)
 	}
 
 	return peers
@@ -48,7 +52,7 @@ func (t *Table) Get (docId string) []string {
 func NewTable () *Table {
 	t := new(Table)
 
-	t.table = make(map[string] []string)
+	t.table = make(map[string] map[string] struct{})
 
 	return t
 }

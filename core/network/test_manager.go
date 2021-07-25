@@ -19,6 +19,18 @@ type DummyManager struct {
 	mu          sync.Mutex
 }
 
+func (d *DummyManager) ConnectSignals(peerConnectedListener PeerConnectedListener, peerDisconnectedListener PeerDisconnectedListener) {
+
+}
+
+func (d *DummyManager) OnPeerConnect(peerConnectedListener PeerConnectedListener) {
+
+}
+
+func (d *DummyManager) OnPeerDisconnect(peerDisconnectedListener PeerDisconnectedListener) {
+
+}
+
 func (d *DummyManager) GetId() utils.UUID {
 	return d.Id
 }

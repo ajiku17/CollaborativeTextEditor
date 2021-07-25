@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/pion/webrtc/v3"
 	"sync"
-	"time"
 )
 
 type ConnectionStateChangeCallback func ()
@@ -60,8 +59,22 @@ func (p *PeerConn) OnMessage(callback MessageCallback) {
 }
 
 func (p *PeerConn) Close() error {
-	if err := p.Conn.Close(); err != nil {
-		//fmt.Printf("cannot close peer.Conn: %v\n", err)
+	p.mu.Lock()
+	p.terminated = true
+	p.mu.Unlock()
+
+	fmt.Println("closing connection to", p.endpointId)
+
+	err := p.Channel.Close()
+	if err != nil {
+		fmt.Printf("cannot close channel. endpoint: %v, error: %v\n", p.endpointId, err)
+		return nil
+	}
+
+	err = p.Conn.Close()
+
+	if err != nil {
+		fmt.Printf("cannot close peer.Conn. endpoint: %v, error: %v\n", p.endpointId, err)
 		return err
 	}
 
@@ -73,39 +86,4 @@ func (p *PeerConn) SendMessage(data []byte) error {
 	err := p.Channel.Send(data)
 
 	return err
-}
-
-func (m *P2P) handleSignals(p *PeerConn, msgQueue chan interface{}, errc chan error) {
-	//fmt.Println(m.peerId, "handling signals from", p.GetEndpoint(), "answer callback: ", p.onConnAnswerCallback)
-	for {
-		p.mu.Lock()
-		terminated := p.terminated
-		p.mu.Unlock()
-
-		if terminated {
-			return
-		}
-
-		timer := time.After(10 * time.Second)
-
-		select {
-		case msg := <- msgQueue:
-			//fmt.Println(m.peerId, "received data from", p.endpointId)
-
-			switch msg.(type) {
-			case ICECandidateMsg:
-				//fmt.Println("received ice candidate message", msg)
-				p.onICECandidateCallback(msg.(ICECandidateMsg))
-			case ConnAnswer:
-				//fmt.Println("received answer")
-				p.onConnAnswerCallback(msg.(ConnAnswer))
-			case ConnRefuse:
-				//fmt.Println("connection refused")
-				errc <- fmt.Errorf("connection refused")
-			}
-		case <- timer:
-			//fmt.Println("peer signal timer fired off")
-			continue
-		}
-	}
 }

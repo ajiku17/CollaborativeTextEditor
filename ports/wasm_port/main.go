@@ -36,13 +36,13 @@ func buildChangeCallback(changeCallback js.Value) synceddoc.ChangeListener {
 	}
 }
 
-func buildPeerConnectedCallback(peerConnectedCallback js.Value) synceddoc.PeerConnectedListener {
+func buildPeerConnectedCallback(peerConnectedCallback js.Value) network.PeerConnectedListener {
 	return func (peerId utils.UUID, cursorPosition int, aux interface{}) {
 		peerConnectedCallback.Invoke(string(peerId), cursorPosition)
 	}
 }
 
-func buildPeerDisconnectedCallback(peerDisconnectedCallback js.Value) synceddoc.PeerDisconnectedListener {
+func buildPeerDisconnectedCallback(peerDisconnectedCallback js.Value) network.PeerDisconnectedListener {
 	return func (peerId utils.UUID, aux interface{}) {
 		peerDisconnectedCallback.Invoke(string(peerId))
 	}
@@ -66,8 +66,8 @@ func DocumentOpen(this js.Value, i []js.Value) interface {} {
 	trackerC := tracker.NewClient(TRACKER_URL)
 	manager := network.NewP2PManager(siteId, doc, SIGNALING_URL, trackerC)
 
-	doc.ConnectSignals(buildChangeCallback(changeCallback),
-		buildPeerConnectedCallback(peerConnectedCallback),
+	doc.ConnectSignals(buildChangeCallback(changeCallback))
+	manager.ConnectSignals(buildPeerConnectedCallback(peerConnectedCallback),
 		buildPeerDisconnectedCallback(peerDisconnectedCallback))
 	docManager.PutDocument(Document{
 		Doc:        doc,
@@ -108,8 +108,8 @@ func DocumentDeserialize(this js.Value, i []js.Value) interface {} {
 	trackerC := tracker.NewClient(TRACKER_URL)
 	manager := network.NewP2PManager(siteId, doc, SIGNALING_URL, trackerC)
 
-	doc.ConnectSignals(buildChangeCallback(changeCallback),
-		buildPeerConnectedCallback(peerConnectedCallback),
+	doc.ConnectSignals(buildChangeCallback(changeCallback))
+	manager.ConnectSignals(buildPeerConnectedCallback(peerConnectedCallback),
 		buildPeerDisconnectedCallback(peerDisconnectedCallback))
 	docManager.PutDocument(Document{
 		Doc:        doc,
@@ -139,8 +139,8 @@ func DocumentNew(this js.Value, i []js.Value) interface {} {
 	trackerC := tracker.NewClient(TRACKER_URL)
 	manager := network.NewP2PManager(siteId, doc, SIGNALING_URL, trackerC)
 
-	doc.ConnectSignals(buildChangeCallback(changeCallback),
-		buildPeerConnectedCallback(peerConnectedCallback),
+	doc.ConnectSignals(buildChangeCallback(changeCallback))
+	manager.ConnectSignals(buildPeerConnectedCallback(peerConnectedCallback),
 		buildPeerDisconnectedCallback(peerDisconnectedCallback))
 
 	docManager.PutDocument(Document{
@@ -167,9 +167,13 @@ func DocumentClose(this js.Value, i []js.Value) interface {} {
 		return nil
 	}
 
-	doc.Doc.Close()
-	doc.NetManager.Stop()
+	fmt.Println("document CLOSING")
+	go func() {
+		doc.Doc.Close()
+		doc.NetManager.Stop()
+	} ()
 
+	fmt.Println("document CLOSED")
 	docManager.RemoveDocument(DocumentID(docId))
 
 	return nil
@@ -253,12 +257,12 @@ func SetChangeListener(doc synceddoc.Document, callback js.Value) {
 	doc.SetChangeListener(buildChangeCallback(callback))
 }
 
-func SetPeerConnectedListener(doc synceddoc.Document, callback js.Value) {
-	doc.SetPeerConnectedListener(buildPeerConnectedCallback(callback))
+func SetPeerConnectedListener(manager network.Manager, callback js.Value) {
+	manager.OnPeerConnect(buildPeerConnectedCallback(callback))
 }
 
-func SetPeerDisconnectedListener(doc synceddoc.Document, callback js.Value) {
-	doc.SetPeerDisconnectedListener(buildPeerDisconnectedCallback(callback))
+func SetPeerDisconnectedListener(manager network.Manager, callback js.Value) {
+	manager.OnPeerDisconnect(buildPeerDisconnectedCallback(callback))
 }
 
 func DocumentSetListener(this js.Value, i []js.Value) interface {} {
@@ -274,13 +278,12 @@ func DocumentSetListener(this js.Value, i []js.Value) interface {} {
 
 	switch callbackName {
 	case "onChange": SetChangeListener(doc.Doc, callback)
-	case "onPeerConnect": SetPeerConnectedListener(doc.Doc, callback)
-	case "onPeerDisconnect": SetPeerDisconnectedListener(doc.Doc, callback)
+	case "onPeerConnect": SetPeerConnectedListener(doc.NetManager, callback)
+	case "onPeerDisconnect": SetPeerDisconnectedListener(doc.NetManager, callback)
 	}
 
 	return nil
 }
-
 
 func DocumentDisconnect(this js.Value, i []js.Value) interface {} {
 	docId := i[0].String()
@@ -294,10 +297,9 @@ func DocumentDisconnect(this js.Value, i []js.Value) interface {} {
 
 	fmt.Println("Document Disconnect")
 
-	//doc.Doc.Close()
-	doc.NetManager.Stop()
-
-	//docManager.RemoveDocument(DocumentID(docId))
+	go func () {
+		doc.NetManager.Stop()
+	}()
 
 	return nil
 }
@@ -312,11 +314,10 @@ func DocumentReconnect(this js.Value, i []js.Value) interface {} {
 		return nil
 	}
 
-	fmt.Println("Reconnecting ", doc.Doc)
-	//doc.Doc.Close()
-	doc.NetManager.Start()
-
-	//docManager.RemoveDocument(DocumentID(docId))
+	go func () {
+		fmt.Println("Reconnecting ", doc.Doc)
+		doc.NetManager.Start()
+	}()
 
 	return nil
 }

@@ -367,7 +367,7 @@ func TestManyPeersLateConnect(t *testing.T) {
 	insertString(doc5, text5)
 	insertString(doc6, text6)
 
-	time.Sleep(4000 * time.Millisecond)
+	time.Sleep(5000 * time.Millisecond)
 
 	AssertTrue(t, len(doc1.ToString()) == len(text1) + len(text2) + len(text3) + len(text4) + len(text5) + len(text6))
 	AssertTrue(t, doc1.ToString() == doc2.ToString())
@@ -375,6 +375,70 @@ func TestManyPeersLateConnect(t *testing.T) {
 	AssertTrue(t, doc3.ToString() == doc4.ToString())
 	AssertTrue(t, doc4.ToString() == doc5.ToString())
 	AssertTrue(t, doc5.ToString() == doc6.ToString())
+}
+
+func TestReconnect(t *testing.T) {
+	sUrl, tUrl, closeFn := setupTest(t)
+	defer closeFn()
+
+	trackerC1 := tracker.NewClient(tUrl)
+	siteId1 := "1"
+	doc1 := synceddoc.New(siteId1)
+
+	trackerC2 := tracker.NewClient(tUrl)
+	siteId2 := "2"
+	doc2, err := synceddoc.Open(siteId2, string(doc1.GetID()))
+	AssertTrue(t, err == nil)
+
+	m1 := network.NewP2PManager(utils.UUID(siteId1), doc1, sUrl, trackerC1)
+	m2 := network.NewP2PManager(utils.UUID(siteId2), doc2, sUrl, trackerC2)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	text1 := "Hello world"
+	text2 := "Hello indeed"
+
+	go func () {
+		m1.Start()
+
+		insertString(doc1, text1)
+
+		wg.Done()
+	} ()
+
+	go func () {
+		m2.Start()
+
+		insertString(doc2, text2)
+
+		wg.Done()
+	} ()
+
+	wg.Wait()
+
+	time.Sleep(1000 * time.Millisecond) // wait for synchronization
+
+	fmt.Println("doc1:", doc1.ToString(), "doc2:", doc2.ToString())
+	AssertTrue(t, len(doc1.ToString()) == len(text1) + len(text2))
+	AssertTrue(t, len(doc1.ToString()) == len(doc2.ToString()))
+	AssertTrue(t, doc1.ToString() == doc2.ToString())
+
+	m1.Stop()
+	insertString(doc1, text1)
+
+	time.Sleep(6000 * time.Millisecond)
+
+	AssertTrue(t, len(doc1.ToString()) == len(text1) * 2 + len(text2))
+	AssertTrue(t, len(doc2.ToString()) == len(text1) + len(text2))
+	AssertTrue(t, doc1.ToString() != doc2.ToString())
+
+	m1.Start()
+
+	time.Sleep(4000 * time.Millisecond)
+
+	AssertTrue(t, len(doc2.ToString()) == len(text1) * 2 + len(text2))
+	AssertTrue(t, doc1.ToString() == doc2.ToString())
 }
 
 func setupTest(t *testing.T) (signalingURL string, trackerURL string, closeFn func()) {

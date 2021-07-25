@@ -11,8 +11,6 @@ import (
 // | MessageDelete    |
 type ChangeListener func (changeName string, change interface {}, aux interface{})
 
-type PeerConnectedListener func (peerId utils.UUID, cursorPosition int, aux interface{})
-type PeerDisconnectedListener func (peerId utils.UUID, aux interface{})
 
 type DocumentState interface{
 	NumberOfOps() int
@@ -28,9 +26,7 @@ type Document interface {
 	GetID() utils.UUID
 
 	// ConnectSignals sets signal handlers
-	ConnectSignals(changeListener ChangeListener,
-		peerConnectedListener PeerConnectedListener,
-		peerDisconnectedListener PeerDisconnectedListener)
+	ConnectSignals(changeListener ChangeListener)
 
 	/*
 	 * Atomically sets listeners, without missing any changes.
@@ -38,8 +34,6 @@ type Document interface {
 	 * change the listeners already passed in at Document creation time.
 	 */
 	SetChangeListener(listener ChangeListener)
-	SetPeerConnectedListener(listener PeerConnectedListener)
-	SetPeerDisconnectedListener(listener PeerDisconnectedListener)
 
 	/*
 	 * Returns the contents of this document serialized into a byte array
