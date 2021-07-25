@@ -29,6 +29,7 @@ type P2PManager struct {
 	inbound  chan P2PMessage
 	outbound chan P2PMessage
 
+	stopped bool
 	killed bool
 	mu sync.Mutex
 }
@@ -38,6 +39,7 @@ func NewP2PManager(siteId utils.UUID, doc synceddoc.Document, signalingURL strin
 
 	m.id = siteId
 	m.doc = doc
+	m.stopped = false
 	m.killed = false
 
 	m.signalingURL = signalingURL
@@ -56,6 +58,8 @@ func (m *P2PManager) GetId() utils.UUID {
 }
 
 func (m *P2PManager) Start() {
+	m.stopped = false
+
 	m.p2p = p2p.New(m.signalingURL, string(m.id), STUN_URL)
 
 	peers, err := m.trackerC.RegisterAndGet(string(m.doc.GetID()), string(m.id))
@@ -98,6 +102,14 @@ func (m *P2PManager) Start() {
 			IsState:  true,
 			State:    docState,
 		}
+
+
+		m.doc.(*synceddoc.SyncedDocument).OnPeerConnect(utils.UUID(endpointPeerId), 0, nil)
+
+	})
+
+	m.p2p.OnPeerDisconnection(func(endpointPeerId string, conn *p2p.PeerConn, aux interface{}) {
+		m.doc.(*synceddoc.SyncedDocument).OnPeerDisconnect(utils.UUID(endpointPeerId), nil)
 	})
 
 	err = m.p2p.Start()
@@ -135,24 +147,15 @@ func (m *P2PManager) Start() {
 				return
 			}
 
+
 			m.connsMu.Lock()
 			m.conns[conn] = struct{}{} // save newly setup connection
 			m.connsMu.Unlock()
 
-			docState := m.doc.GetCurrentState()
 			//fmt.Println(m.id, "sending patch request to newly established", conn.GetEndpoint())
-			m.outbound <- P2PMessage{
-				Sender:   string(m.id),
-				Receiver: conn.GetEndpoint(),
-				Data:     nil,
-				IsPatch:  false,
-				Patch:    nil,
-				IsState:  true,
-				State:    docState,
-			}
+
 		} (p)
 	}
-
 
 	// wait for connections
 	//wg.Wait()
@@ -301,6 +304,16 @@ func (m *P2PManager) sendToConn(conn *p2p.PeerConn, msg P2PMessage) {
 
 func (m *P2PManager) requestProcessor () {
 	for {
+		fmt.Println("Request processed by p2p manager ", m.stopped)
+
+
+		m.mu.Lock()
+		stopped := m.stopped
+		m.mu.Unlock()
+		if stopped {
+			continue
+		}
+
 		var killed bool
 		m.mu.Lock()
 		killed = m.killed
@@ -366,6 +379,7 @@ func (m *P2PManager) processRequest(msg P2PMessage) (bool, P2PMessage, error) {
 }
 
 func (m *P2PManager) Stop() {
+	m.stopped = true
 	m.p2p.Stop()
 }
 

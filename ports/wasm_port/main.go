@@ -281,6 +281,46 @@ func DocumentSetListener(this js.Value, i []js.Value) interface {} {
 	return nil
 }
 
+
+func DocumentDisconnect(this js.Value, i []js.Value) interface {} {
+	docId := i[0].String()
+
+	doc, err := docManager.GetDocument(DocumentID(docId))
+
+	if err != nil {
+		fmt.Println("error: ", err)
+		return nil
+	}
+
+	fmt.Println("Document Disconnect")
+
+	//doc.Doc.Close()
+	doc.NetManager.Stop()
+
+	//docManager.RemoveDocument(DocumentID(docId))
+
+	return nil
+}
+
+func DocumentReconnect(this js.Value, i []js.Value) interface {} {
+	docId := i[0].String()
+
+	doc, err := docManager.GetDocument(DocumentID(docId))
+
+	if err != nil {
+		fmt.Println("error: ", err)
+		return nil
+	}
+
+	fmt.Println("Reconnecting ", doc.Doc)
+	//doc.Doc.Close()
+	doc.NetManager.Start()
+
+	//docManager.RemoveDocument(DocumentID(docId))
+
+	return nil
+}
+
 func registerCallbacks() {
 	js.Global().Set("DocumentOpen", js.FuncOf(DocumentOpen))
 	js.Global().Set("DocumentDeserialize", js.FuncOf(DocumentDeserialize))
@@ -291,6 +331,8 @@ func registerCallbacks() {
 	js.Global().Set("DocumentChangeCursor", js.FuncOf(DocumentChangeCursor))
 	js.Global().Set("DocumentSerialize", js.FuncOf(DocumentSerialize))
 	js.Global().Set("DocumentSetListener", js.FuncOf(DocumentSetListener))
+	js.Global().Set("DocumentDisconnect", js.FuncOf(DocumentDisconnect))
+	js.Global().Set("DocumentReconnect", js.FuncOf(DocumentReconnect))
 }
 
 func main() {

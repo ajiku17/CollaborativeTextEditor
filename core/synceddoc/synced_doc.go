@@ -66,8 +66,8 @@ type SyncedDocument struct {
 	lastLocalOpIndex int
 
 	onChange         ChangeListener
-	onPeerConnect    PeerConnectedListener
-	onPeerDisconnect PeerDisconnectedListener
+	OnPeerConnect    PeerConnectedListener
+	OnPeerDisconnect PeerDisconnectedListener
 
 	killed bool
 	mu     sync.Mutex
@@ -115,11 +115,11 @@ func registerTypes() {
 }
 
 func setPeerDisconnectedListener(d *SyncedDocument, listener PeerDisconnectedListener) {
-	d.onPeerDisconnect = listener
+	d.OnPeerDisconnect = listener
 }
 
 func setPeerConnectedListener(d *SyncedDocument, listener PeerConnectedListener) {
-	d.onPeerConnect = listener
+	d.OnPeerConnect = listener
 }
 
 func setChangeListener(d *SyncedDocument, listener ChangeListener) {
