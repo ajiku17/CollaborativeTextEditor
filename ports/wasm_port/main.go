@@ -75,7 +75,7 @@ func DocumentOpen(this js.Value, i []js.Value) interface {} {
 	})
 
 	// call js init callback
-	initCallback.Invoke(doc.ToString())
+	initCallback.Invoke(doc.ToString(), string(siteId))
 
 	go func () {
 		manager.Start()
@@ -117,7 +117,7 @@ func DocumentDeserialize(this js.Value, i []js.Value) interface {} {
 	})
 
 	// call init callback
-	initCallback.Invoke(doc.ToString())
+	initCallback.Invoke(doc.ToString(), string(siteId))
 
 	go func () {
 		manager.Start()
@@ -132,7 +132,8 @@ func DocumentNew(this js.Value, i []js.Value) interface {} {
 	changeCallback := i[0]
 	peerConnectedCallback := i[1]
 	peerDisconnectedCallback := i[2]
-	resolve := i[3]
+	initCallback := i[3]
+	resolve := i[4]
 
 	siteId = utils.GenerateNewUUID()
 	doc := synceddoc.New(string(siteId))
@@ -147,6 +148,8 @@ func DocumentNew(this js.Value, i []js.Value) interface {} {
 		Doc:        doc,
 		NetManager: manager,
 	})
+
+	initCallback.Invoke("", string(siteId))
 
 	go func () {
 		manager.Start()
