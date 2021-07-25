@@ -46,31 +46,29 @@
 	</div>
 
 	<br/>
-<!--	<a href="something" class="button4" style="background-color:#f14e4e">Button 1</a>-->
+
 	<div>
 		<text id="peer">peer id</text>
 		<span class="connection"></span>
-		<button type="button" class="btn btn-white btn-animate" style="background-color: #bd717d" onclick="disconnect()">Disconnect</button>
-		<button type="button" class="btn btn-white btn-animate" style="background-color: #71ad73" onclick="reconnect()">Reconnect</button>
+		<button type="button" class="btn btn-white btn-animate round-button" style="background-color: #bd717d" onclick="disconnect()">Disconnect</button>
+		<button type="button" class="btn btn-white btn-animate round-button" style="background-color: #71ad73" onclick="reconnect()">Reconnect</button>
 	</div>
 
 	<br/>
 
 	<div>
-		<button type="button" class="btn btn-white btn-animate" style="background-color: #5a779c" onclick="openNewDoc()">New</button>
+		<button type="button" class="btn btn-white btn-animate round-button" style="background-color: #5a779c" onclick="openNewDoc()">New</button>
 		<input type="file" id="inputElement" style="background-color: #cdb38a">
-		<button type="button" class="btn btn-white btn-animate" style="background-color: #a278ad" onclick="saveLocal()">Save</button>
-		<button type="button" class="btn btn-white btn-animate" style="background-color: #d5d993" onclick="closeDoc()">Close</button>
+		<button type="button" class="btn btn-white btn-animate round-button" style="background-color: #a278ad" onclick="saveLocal()">Save</button>
+		<button type="button" class="btn btn-white btn-animate round-button" style="background-color: #d5d993" onclick="closeDoc()">Close</button>
 	</div>
 
 	<br/>
 
 	<div class="main">
-		<div>
-			<label for="collaborative-text-editor"></label>
-			<textarea id="collaborative-text-editor" name="text-editor" rows="4" cols="50"></textarea>
-		</div>
-		<div><ul id="connected-peers"></ul></div>
+		<label for="collaborative-text-editor"></label>
+		<textarea id="collaborative-text-editor" name="text-editor" class="main1" rows="4" cols="50"></textarea>
+		<div class="main2"><ul id="connected-peers" class="main2"></ul></div>
 	</div>
 
 	<div class="loader"></div>
