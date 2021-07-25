@@ -191,7 +191,7 @@ func (m *P2PManager) backgroundSync() {
 			State:    docState,
 		}
 
-		time.Sleep(10 * time.Second) // sleep for a while
+		time.Sleep(5 * time.Second) // sleep for a while
 	}
 }
 

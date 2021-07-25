@@ -379,6 +379,15 @@ func (d *SyncedDocument) RemoteInsert(peerId utils.UUID, peerOpIndex int, positi
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
+	o, _ := d.peerOps.Get(string(peerId))
+	if o != nil {
+		ops := o.(*treemap.Map)
+		foundOp, _ := ops.Get(peerOpIndex)
+		if foundOp != nil {
+			return false
+		}
+	}
+
 	index := d.localDocument.InsertAtPosition(position, val)
 
 	if index == -1 {
@@ -413,6 +422,15 @@ func (d *SyncedDocument) RemoteDelete(peerId utils.UUID, peerOpIndex int, positi
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
+	o, _ := d.peerOps.Get(string(peerId))
+	if o != nil {
+		ops := o.(*treemap.Map)
+		foundOp, _ := ops.Get(peerOpIndex)
+		if foundOp != nil {
+			return false
+		}
+	}
+
 	index := d.localDocument.DeleteAtPosition(position)
 
 	if index == -1 {
@@ -434,14 +452,20 @@ func (d *SyncedDocument) ApplyRemoteOp(op Op, aux interface{}) {
 		applied := d.RemoteInsert(op.PeerId, op.PeerOpIndex, crdtOp.Pos, crdtOp.Val, aux)
 
 		if applied {
+			//fmt.Println(d.siteId, "applied insert op", crdtOp, "with index", op.PeerOpIndex, "from", op.PeerId)
 			d.updatePeerOps(op)
+		} else {
+			//fmt.Println(d.siteId, "did not apply insert op", crdtOp, "with index", op.PeerOpIndex, "from", op.PeerId)
 		}
 	case crdt.OpDelete:
 		crdtOp := op.Cmd.(crdt.OpDelete)
 		applied := d.RemoteDelete(op.PeerId, op.PeerOpIndex, crdtOp.Pos, aux)
 
 		if applied {
+			//fmt.Println(d.siteId, "applied delete op", crdtOp, "with index", op.PeerOpIndex, "from", op.PeerId)
 			d.updatePeerOps(op)
+		} else {
+			//fmt.Println(d.siteId, "did not apply delete op", crdtOp, "with index", op.PeerOpIndex, "from", op.PeerId)
 		}
 	default:
 		fmt.Println("[SyncedDoc] unknown op")
@@ -527,7 +551,7 @@ func (d *SyncedDocument) addToPeerOps(op Op) {
 		peerOps.Put(op.PeerOpIndex, op)
 		d.peerOps.Put(string(op.PeerId), peerOps)
 	}
-	//fmt.Println(d.siteId, "put op with index", op.PeerOpIndex, "for", string(op.PeerId))
+	//fmt.Println(d.siteId, "put op with index", op.PeerOpIndex, "from", string(op.PeerId))
 
 	d.UpdateDocState(op.PeerId, op.PeerOpIndex)
 }
@@ -785,8 +809,8 @@ func (d *SyncedDocument) CreatePatch(state DocumentState) Patch {
 				}
 
 				ops := m.(*treemap.Map)
-				for _, index := range missingIndices {
-					op, ok := ops.Get(index)
+				for i := len(missingIndices) - 1; i >= 0; i-- {
+					op, ok := ops.Get(missingIndices[i])
 					if !ok {
 						panic ("invalid op index for peer")
 					}
@@ -805,7 +829,9 @@ func (d *SyncedDocument) CreatePatch(state DocumentState) Patch {
 func (d *SyncedDocument) ApplyPatch(patch Patch) {
 	p := patch.(SyncedDocumentPatch)
 
-	//fmt.Println(d.siteId, "applying patch of size", p.NumberOfOps(), p, "from", p.PeerId)
+	//if p.NumberOfOps() > 0 {
+	//	fmt.Println(d.siteId, "applying patch of size", p.NumberOfOps(), p, "from", p.PeerId)
+	//}
 	for _, ops := range p.Patch {
 		for _, op := range ops {
 			d.ApplyRemoteOp(op, nil)
