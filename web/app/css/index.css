@@ -3,17 +3,17 @@ body {
 }
 
 .main {
-    display: inline-block;
-    justify-content: space-between;
+    /*display: inline-block;*/
+    /*justify-content: space-between;*/
     /*border: 1px solid red;*/
 }
-.main1 {
-    float: left;
-}
-.main2 {
-    float: right;
-    /*text-align: center;*/
-}
+/*.main1 {*/
+/*    float: left;*/
+/*}*/
+/*.main2 {*/
+/*    float: right;*/
+/*    !*text-align: center;*!*/
+/*}*/
 
 .connection {
     height: 25px;

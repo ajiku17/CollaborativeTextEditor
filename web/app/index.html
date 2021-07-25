@@ -48,8 +48,8 @@
 	<br/>
 
 	<div>
-		<text id="peer">peer id</text>
-		<span class="connection"></span>
+		<text id="main-peer"></text>
+		<span class="connection" id="main-peer-connection"></span>
 		<button type="button" class="btn btn-white btn-animate round-button" style="background-color: #bd717d" onclick="disconnect()">Disconnect</button>
 		<button type="button" class="btn btn-white btn-animate round-button" style="background-color: #71ad73" onclick="reconnect()">Reconnect</button>
 	</div>
@@ -65,10 +65,15 @@
 
 	<br/>
 
+
 	<div class="main">
 		<label for="collaborative-text-editor"></label>
 		<textarea id="collaborative-text-editor" name="text-editor" class="main1" rows="4" cols="50"></textarea>
-		<div class="main2"><ul id="connected-peers" class="main2"></ul></div>
+		<br/>
+		<div class="main2">
+			<div style="text-align: center">Connected/Disconnected Peers</div>
+			<ul id="connected-peers" class="main2"></ul>
+		</div>
 	</div>
 
 	<div class="loader"></div>

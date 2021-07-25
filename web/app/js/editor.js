@@ -41,13 +41,13 @@ function disableLoading() {
     document.getElementsByClassName('loader').item(0).style.display = 'none'
 }
 
-function connectionChanged(connected) {
+function connectionChanged(id, connected) {
     console.log(connected)
     if (connected) {
-        console.log(document.getElementsByClassName('connection').item(0))
-        document.getElementsByClassName('connection').item(0).style.backgroundColor = '#00bb00'
+        console.log(document.getElementById(id));
+        document.getElementById(id).style.backgroundColor = '#00bb00'
     } else {
-        document.getElementsByClassName('connection').item(0).style.backgroundColor = '#aa1111'
+        document.getElementById(id).style.backgroundColor = '#aa1111'
     }
 }
 
@@ -134,12 +134,24 @@ function onPeerConnect(peerId, cursorPos) {
 }
 
 function addPeer(peerId) {
-    var ul = document.getElementById('connected-peers');
-    var li = document.createElement("li");
-    li.setAttribute('id', peerId)
-    var t = document.createTextNode(peerId + " Connected");
-    li.appendChild(t);
-    ul.appendChild(li);
+    var li = document.getElementById(peerId);
+    if (li != null && li != undefined) {
+        connectionChanged(peerId + '-connection', true)
+    } else {
+        var ul = document.getElementById('connected-peers');
+        var li = document.createElement("li");
+        li.setAttribute('id', peerId)
+
+        var text = document.createTextNode('Peer N.' + peerId);
+        li.appendChild(text);
+
+        var span = document.createElement('span');
+        span.setAttribute('class', 'connection');
+        span.setAttribute('id', peerId + '-connection');
+        li.appendChild(span);
+
+        ul.appendChild(li);
+    }
 }
 
 function onPeerDisconnect(peerId) {
@@ -148,10 +160,11 @@ function onPeerDisconnect(peerId) {
 }
 
 function removePeer(peerId) {
+    console.log("Remove peer" + peerId)
     var li = document.getElementById(peerId);
+    console.log(li)
     if (li != null && li != undefined) {
-        li.textContent = peerId + " disconnected"
-        li.value = peerId + "Disconnected";
+        connectionChanged(peerId + '-connection', false)
     }
 
 }
@@ -173,7 +186,7 @@ function openNewDoc() {
         editor.setValue("")
     }
 
-    DocumentNew(onDocChange, onPeerConnect, onPeerDisconnect, documentLoaded)
+    DocumentNew(onDocChange, onPeerConnect, onPeerDisconnect, initCallback, documentLoaded)
 }
 
 function saveLocal() {
@@ -199,13 +212,12 @@ function closeDoc() {
 }
 
 function disconnect() {
-    connectionChanged(false)
+    connectionChanged('main-peer-connection', false)
     DocumentDisconnect(docId)
 }
 
 function reconnect() {
-    connectionChanged(true)
-    console.log("REconnect")
+    connectionChanged('main-peer-connection', true)
     DocumentReconnect(docId)
 }
 
@@ -225,9 +237,16 @@ function downloadFile(data, filename) {
     }, 0);
 }
 
-function initCallback(initialText) {
+function initCallback(initialText, siteId) {
     editor.setValue(initialText)
+    document.getElementById('main-peer').textContent = "Peer N." + siteId
+    connectionChanged('main-peer-connection', true)
 }
+
+// function peerIdCallback(siteId) {
+//     console.log('!!!!!!!!!!!!!!! Attention!!!!!!!!!!    ' + siteId)
+//     document.getElementById('main-peer').textContent = siteId
+// }
 
 const inputElement = document.getElementById("inputElement")
 
