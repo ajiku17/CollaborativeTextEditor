@@ -235,14 +235,9 @@ function downloadFile(data, filename) {
 
 function initCallback(initialText, siteId) {
     editor.setValue(initialText)
-    document.getElementById('main-peer').textContent = "Peer N." + siteId
+    document.getElementById('peer-id').textContent = "Peer N." + siteId
     connectionChanged('main-peer-connection', true)
 }
-
-// function peerIdCallback(siteId) {
-//     console.log('!!!!!!!!!!!!!!! Attention!!!!!!!!!!    ' + siteId)
-//     document.getElementById('main-peer').textContent = siteId
-// }
 
 const inputElement = document.getElementById("inputElement")
 
